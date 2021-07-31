@@ -1,3 +1,12 @@
 *.code-workspace
 
+*.vo
+*.vos
+*.vok
+*.glob
+*.aux
+
 *.cache
+*.d
+Makefile
+Makefile.conf
