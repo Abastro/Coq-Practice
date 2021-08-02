@@ -25,13 +25,9 @@ Property im_def: forall (X: Ensemble U) (f: U -> V) (x: U),
   x :in: X -> f x :in: Im X f.
 Proof. intros. econstructor; eauto. Qed.
 
-Property im_inv: forall (X: Ensemble U) (f: U -> V) (y: V),
-  y :in: Im X f -> exists x: U, (x :in: X) /\ f x = y.
-Proof. intros. destruct H. eauto. Qed.
-
 Property im_iff: forall (X: Ensemble U) (f: U -> V) (y: V),
   y :in: Im X f <-> exists x: U, (x :in: X) /\ f x = y.
-Proof. split. apply im_inv. intros [x []]; subst. apply im_def. assumption. Qed.
+Proof. split. intros []. eauto. intros [x []]; subst. apply im_def. assumption. Qed.
 
 Lemma im_empty: forall (f: U -> V),
   Im (Empty_set U) f '= Empty_set V.
@@ -39,12 +35,12 @@ Proof. autounfold. split; intros H; repeat destruct H. Qed.
 
 Lemma im_intersect: forall (f: U -> V) (A B: Ensemble U),
   Im (A //\\ B) f <:= Im A f //\\ Im B f.
-Proof. intros. autounfold with sets. intros y H.
-  split; apply im_inv in H as [x []]; subst; destruct H; apply im_def; assumption. Qed.
+Proof. intros. unfold Included. intros y [? [[x] ?]]%im_iff; subst.
+  split; apply im_def; assumption. Qed.
 
 Lemma im_union: forall (f: U -> V) (A B: Ensemble U),
   Im (A \\// B) f '= Im A f \\// Im B f.
-Proof with (eauto using im_def with sets).
+Proof.
   intros; intros y. rewrite union_iff. repeat rewrite im_iff.
   setoid_rewrite union_iff. firstorder. Qed.
 
@@ -53,14 +49,14 @@ Lemma forall_im_iff: forall (P: Ensemble U) (f: U -> V) (g: V -> Prop),
 Proof.
   intros. split.
   - intros H ? ?. apply H. apply im_def. assumption.
-  - intros H ? [? []]%im_inv; subst. firstorder.
+  - intros H ? [? []]%im_iff; subst. firstorder.
 Qed.
 
 Lemma exists_im_iff: forall (P: Ensemble U) (f: U -> V) (g: V -> Prop),
   ExistsIn (Im P f) g <-> ExistsIn P (fun x => g (f x)).
 Proof.
   intros. split.
-  - intros [? [[? []]%im_inv ?]]; subst. eauto with sets.
+  - intros [? [[? []]%im_iff ?]]; subst. eauto with sets.
   - intros [? []]. eexists. split; eauto using im_def.
 Qed.
 
@@ -98,7 +94,7 @@ Proof. intros. intros x H. apply invim_iff. apply im_def. trivial. Qed.
 Lemma inj_invim_of_im_eq: forall (f: U -> V) (A: Ensemble U),
   injective f -> InvIm (Im A f) f '= A.
 Proof. intros. apply same_set_eq. split; [| apply invim_of_im_inc].
-  intros x [x' [? E]] %invim_iff %im_inv. apply H in E; subst. trivial. Qed.
+  intros x [x' [? E]] %invim_iff %im_iff. apply H in E; subst. trivial. Qed.
 
 Lemma im_of_invim_inc: forall (f: U -> V) (B: Ensemble V),
   Im (InvIm B f) f <:= B.
@@ -136,53 +132,30 @@ Lemma invim_identity: forall U (A: Ensemble U), InvIm A id '= A.
 Proof. autounfold. intros. setoid_rewrite invim_iff. reflexivity. Qed.
 
 
-(* Image of Power set - used to denote indexed set *)
-Section Mapping.
-Context {U:Type} {V:Type}.
+(* Indexed, Proper form of Image of Power set *)
 
-Inductive PowerIm (X: Ensemble U) (f: U -> Ensemble V): PowerEn V :=
-  intro_powim: forall x: U, x :in: X -> forall A, A '= f x -> A :in: PowerIm X f.
-
-Property powim_def: forall (X: Ensemble U) (f: U -> Ensemble V) x,
-  x :in: X -> f x :in: PowerIm X f.
-Proof. intros. econstructor; eauto. Qed.
-
-Property powim_iff: forall (X: Ensemble U) (f: U -> Ensemble V) A,
-  A :in: PowerIm X f <-> (exists x, x :in: X /\ A '= f x).
-Proof. split; intros []; try (destruct H; econstructor); eauto. Qed.
-
-End Mapping.
-
-Add Parametric Morphism U V: (@PowerIm U V)
-  with signature eqs ==> eqs ==> eqs as powim_mor.
-Proof. intros. intros s. repeat rewrite powim_iff.
-  split; intros [t []]; exists t; all_rewrite; eauto. Qed.
-
-Notation "'indexed' i 'in' P , e" := (PowerIm P (fun i => e))
+Notation "'indexed' i 'in' P , e" := (properForm (Im P (fun i => e)))
   (at level 90, i binder, right associativity).
 
 
 #[export]
-Hint Constructors Im InvIm PowerIm: sets.
+Hint Constructors Im InvIm: sets.
 #[export]
 Hint Resolve im_def im_empty invim_empty invim_full
-  invim_intersect invim_union im_identity invim_identity
-  powim_def: sets.
+  invim_intersect invim_union im_identity invim_identity: sets.
 #[export]
-Hint Resolve -> im_iff invim_iff exists_im_iff forall_im_iff
-  powim_iff: sets.
+Hint Resolve -> im_iff invim_iff exists_im_iff forall_im_iff: sets.
 #[export]
-Hint Resolve <- im_iff invim_iff exists_im_iff forall_im_iff
-  powim_iff: sets.
+Hint Resolve <- im_iff invim_iff exists_im_iff forall_im_iff: sets.
 
 (* ----------------------------------------------------------------- *)
 (*                      UnionOver / IntersectOver                    *)
 (* ----------------------------------------------------------------- *)
 
 Definition UnionOver {U:Type} {V:Type} (P: Ensemble U) (f: U -> Ensemble V): Ensemble V :=
-  Unions (PowerIm P f).
+  Unions (Im P f).
 Definition IntersectOver {U:Type} {V:Type} (P: Ensemble U) (f: U -> Ensemble V): Ensemble V :=
-  Intersects (PowerIm P f).
+  Intersects (Im P f).
 
 Notation "'unions' i 'in' P , e" := (UnionOver P (fun i => e))
   (at level 100, i binder, right associativity).

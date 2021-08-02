@@ -142,6 +142,16 @@ Definition properPset {U:Type} (P: PowerEn U): Prop :=
   Morphisms.Proper (eqs ==> iff) P.
 Definition Powerset (U:Type) := { P: PowerEn U | properPset P }.
 
+(* Power set that is made proper *)
+Definition properForm {U:Type} (P: PowerEn U): PowerEn U :=
+  fun A => exists B, B :in: P /\ B '= A.
+Property properForm_spec: forall U (P: PowerEn U), properPset (properForm P).
+Proof. do 3 red. firstorder. Qed.
+
+Definition asProper {U:Type} (P: PowerEn U): Powerset U :=
+  exist _ _ (properForm_spec U P).
+
+
 (* Powerset on certain set *)
 Definition PSeton {U:Type} (A: Ensemble U): PowerEn U := fun V => V <:= A.
 
@@ -229,7 +239,7 @@ Fixpoint IntersectList {U:Type} (L: list (Ensemble U)): Ensemble U :=
 
 
 #[export]
-Hint Unfold ExistsIn ForallIn PowerEn properPset Powerset PSeton
+Hint Unfold ExistsIn ForallIn PowerEn properPset Powerset properForm PSeton
   UnionList IntersectList: sets.
 #[export]
 Hint Constructors Unions Intersects: sets.
@@ -237,7 +247,7 @@ Hint Constructors Unions Intersects: sets.
 Hint Resolve included_full
   union_comm union_assoc intersection_comm intersection_assoc
   union_incl union_incl2 intersection_incl intersection_incl2
-  union_incl_distr intersection_incl_distr
+  union_incl_distr intersection_incl_distr      properForm_spec
   unions_inc_one intersects_inced_one unions_empty intersects_empty: sets.
 #[export]
 Hint Resolve -> same_set_eq union_incl_split intersection_incl_split

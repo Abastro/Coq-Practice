@@ -215,7 +215,7 @@ Proof with (eauto with sets).
     split; [apply (open_intersect (getPr T)) | all_rewrite ]...
 Qed.
 
-Program Definition SubspaceT: Topology (Subset A) := exist _ subspOpen_ subspace_topo.
+Definition SubspaceT: Topology (Subset A) := exist _ subspOpen_ subspace_topo.
 
 Lemma open_subsp_open_whole: forall U: Ensemble (Subset A),
   open(T) A -> open(SubspaceT) U -> open(T) (Im U incl).
@@ -236,21 +236,30 @@ Context {X:Type} {Y:Type}.
 Context (B: Topology X) (C: Topology Y).
 
 Definition prodBasis: PowerEn (X * Y) :=
-  sfor P in open(B) ** open(C), fst P ** snd P.
-
-(*
-Program Definition prodBasis_: Powerset (X * Y) := exist _ prodBasis _.
-Next Obligation. do 3 red. intros. unfold prodBasis. setoid_rewrite im_iff.
-  split. intros [p []]. rewrite <- H1 in *.
-*)
+  indexed P in open(B) ** open(C), fst P ** snd P.
+Definition prodBasis_: Powerset (X * Y) := exist _ prodBasis (properForm_spec _ _).
 
 Property prod_basis: isBase prodBasis.
 Proof with (eauto with sets).
   split; unfold prodBasis.
   - (* Covers *)
-    exists ( {|' Full_set (X * Y) '|} ).
-    split. intros ? []. econstructor. apply prod_iff. split.
-    apply (open_empty_total(getPr B)). apply (open_empty_total(getPr C)).
+    exists ( {|' Full_set (X * Y) '|} ). split.
+    + intros ? []. exists (Full_set X ** Full_set Y). split... econstructor. split.
+      apply (open_empty_total(getPr B)). apply (open_empty_total(getPr C)). reflexivity.
+    + red...
+  - (* Intersection *)
+    intros T1 T2 x [T1' [H1 E1]] [T2' [H2 E2]] H.
+    exists (T1' //\\ T2'). split; [| all_rewrite]...
+    apply im_iff in H1 as [(U1, V1) [[HU1 HV1]%prod_iff ?]].
+    apply im_iff in H2 as [(U2, V2) [[HU2 HV2]%prod_iff ?]]. subst.
+    pose proof (H1 := open_intersect (getPr B) _ _ HU1 HU2).
+    pose proof (H2 := open_intersect (getPr C) _ _ HV1 HV2).
+    eexists. split...
+Qed.
+
+Definition ProductB: Basis (X * Y) := exist _ prodBasis_ prod_basis.
+Definition ProductT: Topology (X * Y) := topoByBase ProductB.
+
 
 End Product.
 
