@@ -17,6 +17,7 @@ Module Type PartialOrder := StrOrder <+ HasLe <+ LeIsLtEq.
 
 Module InfSup (Import O: UsualTotalOrder').
 Import Set_Extras.
+Import Unique_Extras.
 Module OF := OrderFacts O O. Import OF.
 Module MOT := MakeOrderTac O O. Import MOT.
 
@@ -178,27 +179,26 @@ Hint Resolve <- bnds_iff range_inc_iff range_exc_iff range_inc_include_iff: orde
 Hint Resolve range_incl_extreme: ordered_type.
 
 Add Parametric Morphism : Bound
-  with signature Logic.eq ==> (Same_set U) ==> Logic.eq ==> iff as bound_mor.
+  with signature Logic.eq ==> eqs ==> Logic.eq ==> iff as bound_mor.
 Proof. unfold Bound. intros. rw_refl. Qed.
 Add Parametric Morphism : Extremum
-  with signature Logic.eq ==> (Same_set U) ==> Logic.eq ==> iff as ext_mor.
+  with signature Logic.eq ==> eqs ==> Logic.eq ==> iff as ext_mor.
 Proof. unfold Extremum. intros. rw_refl. Qed.
 Add Parametric Morphism : Bounded_D
-  with signature Logic.eq ==> (Same_set U) ==> iff as bddd_mor.
+  with signature Logic.eq ==> eqs ==> iff as bddd_mor.
 Proof. unfold Bounded_D. intros. rw_refl. Qed.
 
 Add Parametric Morphism : Bnds (* The encapsulation requires further proof *)
-  with signature Logic.eq ==> (Same_set U) ==> Same_set U as bnd_mor.
+  with signature Logic.eq ==> eqs ==> eqs as bnd_mor.
 Proof.
-  assert (bnds_same: forall d A, Bnds d A ~~ Bound d A). {
-    setoid_rewrite eq_set_prop. apply bnds_iff. }
-  setoid_rewrite bnds_same. intros. rewrite eq_set_prop. unfold In. rw_refl.
+  assert (bnds_same: forall d A, Bnds d A '= Bound d A). { autounfold. apply bnds_iff. }
+  setoid_rewrite bnds_same. intros. autounfold. intros. apply bound_mor; rw_refl.
 Qed.
 Add Parametric Morphism : Bounded
-  with signature (Same_set U) ==> iff as bdd_mor.
+  with signature eqs ==> iff as bdd_mor.
 Proof. unfold Bounded. intros. rw_refl. Qed.
 Add Parametric Morphism : Limfemum
-  with signature Logic.eq ==> (Same_set U) ==> Logic.eq ==> iff as limf_mor.
+  with signature Logic.eq ==> eqs ==> Logic.eq ==> iff as limf_mor.
 Proof. unfold Limfemum. intros. rw_refl. Qed.
 
 (* ----------------------------------------------------------------- *)
@@ -220,8 +220,8 @@ Lemma bnds_included: forall d A B, A =:> B -> Bnds d A <:= Bnds d B.
 Proof. unfold Included. intros. repeat rewrite bnds_iff in *. auto with ordered_type. Qed.
 
 (* set union ~> bounds intersection *)
-Lemma bnds_union: forall d A B, Bnds d (A \\// B) ~~ Bnds d A //\\ Bnds d B.
-Proof. split; unfold Included; intros x H.
+Lemma bnds_union: forall d A B, Bnds d (A \\// B) '= Bnds d A //\\ Bnds d B.
+Proof. intros. autounfold. split; intros H.
 - (* <:= *)
   constructor; rewrite bnds_iff in *; auto with sets ordered_type.
 - (* =:> *)
@@ -273,21 +273,21 @@ Hint Resolve bnds_contains_op_range bnds_in_op_range bnds_included bnds_union
 
 
 Property range_inc_bound: forall d a,
-  Bnds d (Range_inc d a) ~~ Range_inc (dnot d) a.
-Proof. intros. split; auto with ordered_type. Qed.
+  Bnds d (Range_inc d a) '= Range_inc (dnot d) a.
+Proof. intros. apply same_set_eq. split; auto with ordered_type. Qed.
 Property range_inc_infsup: forall d a, Limfemum d (Range_inc d a) a.
 Proof. intros. unfold Limfemum. setoid_rewrite range_inc_bound. apply range_incl_extreme. Qed.
 
 (* Infimum/Supremum exists iff the bound is given as an inclusive range. *)
 Proposition infsup_gives_bnds_range: forall d (A: Ensemble U) s,
-  Limfemum d A s <-> Bnds d A ~~ Range_inc (dnot d) s.
+  Limfemum d A s <-> Bnds d A '= Range_inc (dnot d) s.
 Proof with (auto with ordered_type).
   unfold Limfemum, Extremum. split.
-  - (* -> *) intros [HI HB]. split...
+  - (* -> *) intros [HI HB]. apply same_set_eq. split...
   - (* <- *) intros H. setoid_rewrite H...
 Qed.
 Corollary bnds_to_range_limf: forall d (A: Ensemble U) (lA: Limf d A),
-  Bnds d A ~~ Range_inc (dnot d) (get lA).
+  Bnds d A '= Range_inc (dnot d) (get lA).
 Proof. intros. specialize (get_unique_spec _ _ lA) as H. apply infsup_gives_bnds_range. destruct H. trivial. Qed.
 
 Proposition extremum_is_infsup: forall d (A: Ensemble U) (mA: Extr d A),

@@ -9,16 +9,17 @@ Require Import Fin.
 Require List.
 
 From Practice Require Import Base.
-From Practice Require Import Functions.
 From Practice Require Import Sets.
 From Practice Require Import Image.
+From Practice Require Import Product.
 
 Definition Fin := Fin.t.
 
 Module ToposSet.
-Import Function_Extras.
+Import Base.
 Import Set_Extras.
 Import Images.
+Import Products.
 
 Record isTopology {X:Type} (open: Ensemble X -> Prop): Prop := {
   open_empty_total: open (Empty_set _) /\ open (Full_set _)
@@ -39,111 +40,131 @@ Definition covers {X:Type} (V: Ensemble X) (C: PowerEn X): Prop :=
   V <:= Unions C.
 Notation cover_all := (covers (Full_set _)).
 
-(* Topology on Basis *)
-Module TopoBasis.
+(* ----------------------------------------------------------------- *)
+(*                         Topology Basis                            *)
+(* ----------------------------------------------------------------- *)
+
 Definition gopen {X:Type} {P: Powerset X -> Prop} (G: sig P): Ensemble X -> Prop := get (get G).
 
-Record IsBase {X:Type} (open: Ensemble X -> Prop) : Type := {
+Record isBase {X:Type} (open: Ensemble X -> Prop) : Type := {
   bopen_cover: exists (C: PowerEn X), ForallIn C open /\ cover_all C
 ; bopen_intersect: forall (U V: Ensemble X) x,
   open U -> open V -> x :in: U //\\ V -> exists W, open W /\ x :in: W /\ (W <:= U //\\ V)
 }.
-Definition Base (X:Type) := { op: Powerset X | IsBase (get op) }.
+Definition Basis (X:Type) := { op: Powerset X | isBase (get op) }.
 Arguments bopen_cover {X} {open}.
 Arguments bopen_intersect {X} {open}.
 
-Record IsSubbase {X:Type} (open: Ensemble X -> Prop) : Type := {
+Record isSubbase {X:Type} (open: Ensemble X -> Prop) : Type := {
   sopen_cover: exists (C: PowerEn X), ForallIn C open /\ cover_all C
 }.
-Definition Subbase (X:Type) := { op: Powerset X | IsSubbase (get op) }.
+Definition Subbasis (X:Type) := { op: Powerset X | isSubbase (get op) }.
 Arguments sopen_cover {X} {open}.
 
-Section OnSet.
+Section Base.
 Context {X:Type}.
 
-Definition baseCorr: Ensemble X -> PowerEn X -> Prop := fun U F => U ~~ Unions F.
-Definition topoFromBase (B: Base X): Ensemble X -> Prop :=
-  fun U => exists (F: PowerEn X), ForallIn F (gopen(B)) /\ U ~~ Unions F.
-Property topoFromBase_proper (B: Base X): properPset (topoFromBase B).
-Proof. unfold properPset. unfold Morphisms.Proper, Morphisms.respectful.
-  intros U V H. unfold topoFromBase. rw_refl. Qed.
-Local Definition topoFromBase_ (B: Base X): Powerset X := exist _ _ (topoFromBase_proper B).
+(* Obvious lemmas *)
+Property topology_is_base (T: Topology X): isBase (open(T)).
+Proof with (auto with sets). split.
+  - exists ( {|' Full_set X '|} ).
+    split. intros S []. apply (open_empty_total(getPr T)). red...
+  - intros. exists (U //\\ V). split... apply (open_intersect(getPr T))...
+Qed.
 
-(* Quite long, require better abstraction *)
-Property generate_by_base (B: Base X): isTopology (topoFromBase B).
+Property base_is_subbase (B: Basis X): isSubbase (gopen(B)).
+Proof with (auto with sets). split. apply (bopen_cover(getPr B)). Qed.
+
+(* Generation *)
+Definition baseCorr: Ensemble X -> PowerEn X -> Prop := fun U F => U '= Unions F.
+Definition topoFromBase (B: Basis X): Ensemble X -> Prop :=
+  fun U => exists (F: PowerEn X), ForallIn F (gopen(B)) /\ U '= Unions F.
+
+Program Definition topoFromBase_ (B: Basis X): Powerset X := exist _ (topoFromBase B) _.
+Next Obligation. do 3 red. unfold topoFromBase. intros. rw_refl. Qed.
+
+Property generate_by_base (B: Basis X): isTopology (topoFromBase B).
 Proof with (eauto with sets). split.
   - (* Empty & Full *)
     split; unfold topoFromBase.
-    + exists (Empty_set _). split; [firstorder|]. symmetry...
-    + destruct (bopen_cover(getPr B)) as [? [? C]]. unfold cover_all, covers in C...
+    + exists (Empty_set _). split... firstorder...
+    + destruct (bopen_cover(getPr B)) as [? [? C]].
+      setoid_rewrite <- same_set_eq...
+
   - (* Unions is open *)
     intros. unfold topoFromBase.
-    set (N := unions U in M, unions F in PSeton (gopen B) //\\ baseCorr U, F). exists N. split.
-    + intros V HV. unfold N in HV. apply unionover_iff in HV as [U [H1 HV]].
-      apply unionover_iff in HV as [? [[? H0] HV]]. apply H0...
-    + unfold N. rewrite unions_unionover. rewrite <- unions_as_over.
-      apply unionover_mor. unfold gen_ext_eq. intros U HU. apply H in HU as [F [H0 H1]].
-      apply eq_set_prop. split; intros HA.
-      * rewrite H1 in HA. rewrite unions_iff in *. destruct HA as [? []]. eexists.
-        split... apply unionover_iff...
-      * apply unions_iff in HA as [? [HA ?]]. apply unionover_iff in HA as [? [[? ? HA] ?]].
-        unfold baseCorr, In in HA. rewrite HA...
+    set (N := unions U in M, unions F in PSeton (gopen B) //\\ baseCorr U, F).
+    exists N. unfold N. split.
+    + intros V [U [H1 HV]] % unionover_iff.
+      apply unionover_iff in HV as [? [[? H0] HV]].  apply H0...
+    + rewrite unions_unionover. rewrite <- unions_as_over.
+      apply unionover_mor. unfold gen_ext_eq.
+      intros U [F0 [H0 H1]]%H.  rewrite unions_unionover.
+      apply same_set_eq. split;
+      [apply inced_forall_then_inced_unionover | apply inc_forall_unionover_iff];
+      try (intros ? []; do 2 red in H3; rewrite H3)...
+      exists F0...
+
   - (* Intersection is open *)
     intros ? ? [FU (HU1 & HU2)] [FV (HV1 & HV2)]. unfold topoFromBase.
     set (N := gopen(B) //\\ PSeton (U //\\ V)). exists N.
-    split; try (intros ? [])... unfold N. split.
-    + rewrite HU2, HV2. unfold Included. intros ? [x KU KV]. rewrite unions_iff in *.
-      destruct KU as [U1 (KU1 & KU2)]. destruct KV as [V1 (KV1 & KV2)].
+    split; try (intros ? []; auto 1). unfold N.
+    apply same_set_eq. split.
+    + rewrite HU2, HV2. red.
+      intros x [[U1 (KU1 & KU2)] %unions_iff [V1 (KV1 & KV2)] %unions_iff] %intersection_iff.
       assert (E: exists W, gopen(B) W /\ x :in: W /\ U1 //\\ V1 =:> W).
       { apply (bopen_intersect(getPr B))... apply HU1... apply HV1... }
-      destruct E as [W (H1 & H2 & H3)]. exists W. split... split...
-      unfold PSeton, In. etransitivity...
-    + apply inc_forall_unions_iff. intros ? [W ? ?]. firstorder.
+      destruct E as [W (H1 & H2 & H3)]. apply unions_iff.
+      exists W. split... split... unfold PSeton, In.
+      etransitivity; eauto 4 with sets.
+    + apply inc_forall_unions_iff. intros ? []. firstorder.
 Qed.
 
-Definition baseFromSubbase (S: Subbase X): Ensemble X -> Prop :=
-  fun V => exists (L: list (Ensemble X)), List.Forall (gopen(S)) L /\ V ~~ IntersectList L.
-Property baseFromSubbase_proper (S: Subbase X): properPset (baseFromSubbase S).
-Proof. unfold properPset. unfold Morphisms.Proper, Morphisms.respectful.
-  intros U V H. unfold baseFromSubbase. rw_refl. Qed.
-Local Definition baseFromSubbase_ (S: Subbase X): Powerset X := exist _ _ (baseFromSubbase_proper S).
+Definition baseFromSubbase (S: Subbasis X): Ensemble X -> Prop :=
+  fun V => exists (L: list (Ensemble X)), List.Forall (gopen(S)) L /\ V '= IntersectList L.
 
-Property generate_by_subbase (S: Subbase X): IsBase (baseFromSubbase S).
+Program Definition baseFromSubbase_ (S: Subbasis X): Powerset X := exist _ (baseFromSubbase S) _.
+Next Obligation. do 3 red. intros. unfold baseFromSubbase. rw_refl. Qed.
+
+Property generate_by_subbase (S: Subbasis X): isBase (baseFromSubbase S).
 Proof with (auto with sets).
   split.
   - (* Covers *)
     destruct (sopen_cover(getPr S)) as [C []]. exists C. split... unfold ForallIn.
-    intros U A. exists (cons U nil). unfold gopen. split... symmetry.
-    unfold IntersectList...
+    intros U A. exists (cons U nil). unfold gopen.
+    split... unfold IntersectList...
   - (* Intersects *)
-    intros ? ? ? [LU (AU & EU)] [LV (AV & EV)] HI. exists (U //\\ V). split...
-    unfold baseFromSubbase. exists (app LU LV). split. { apply List.Forall_app... }
-    rewrite EU, EV. clear AU AV EU EV. induction LU; simpl.
-    { rewrite intersection_comm... } { rewrite <- IHLU. symmetry... }
+    intros ? ? ? [LU (AU & EU)] [LV (AV & EV)] HI. exists (U //\\ V).
+    split... unfold baseFromSubbase.
+    exists (app LU LV). split; [ apply List.Forall_app | ]...
+    rewrite EU, EV. clear AU AV EU EV.
+    induction LU; unfold app, IntersectList;
+    [ rewrite intersection_comm | rewrite <- IHLU ]...
 Qed.
 
-Definition topoByBase (B: Base X): Topology X := exist _ (topoFromBase_ B) (generate_by_base B).
-Definition baseBySubbase (S: Subbase X): Base X := exist _ (baseFromSubbase_ S) (generate_by_subbase S).
+Definition topoByBase (B: Basis X): Topology X := exist _ (topoFromBase_ B) (generate_by_base B).
+Definition baseBySubbase (S: Subbasis X): Basis X := exist _ (baseFromSubbase_ S) (generate_by_subbase S).
 
-End OnSet.
+End Base.
 
-Lemma basis_gen_minimal: forall X (B: Base X) (T: Topology X),
+(* Topology generated by Basis / Subbasis is minimal -> so it is unique *)
+Lemma basis_gen_minimal: forall X (B: Basis X) (T: Topology X),
   gopen(B) <:= open(T) -> open(topoByBase B) <:= open(T).
 Proof.
-  intros ? ? ? H. unfold Included. intros U H1. destruct H1 as [F [H1 H2]].
+  intros ? ? ? H. red. intros U [F [H1 H2]].
   pose proof (K := getPr (get T)); simpl in K. eapply K; eauto.
   apply (open_union (getPr T)). firstorder.
 Qed.
 
-Lemma subbasis_gen_minimal: forall X (S: Subbase X) (T: Topology X),
+Lemma subbasis_gen_minimal: forall X (S: Subbasis X) (T: Topology X),
   gopen(S) <:= open(T) -> gopen (topoByBase (baseBySubbase S)) <:= open(T).
 Proof.
-  intros ? ? ? H. unfold Included. intros U H1. destruct H1 as [F [H1 H2]].
+  intros ? ? ? H. red. intros U [F [H1 H2]].
   pose proof (K := getPr (get T)); simpl in K. eapply K; eauto. clear H2.
   apply (open_union (getPr T)).
   assert (Claim: ForallIn F (fun V => gopen(baseBySubbase S) V -> open(T) V)). {
-    unfold ForallIn. intros V L L1. destruct L1 as [G [L1 L2]]. eapply K; eauto. clear L2.
-    clear H1. induction G as [| W G]; simpl.
+    unfold ForallIn. intros V L [G [L1 L2]]. eapply K; eauto. clear L2 H1.
+    induction G as [| W G]; simpl.
     - (* empty case *) apply (open_empty_total (getPr T)).
     - (* inductive case *)
       inversion L1; subst. apply (open_intersect (getPr T)); auto; firstorder.
@@ -151,53 +172,87 @@ Proof.
   unfold ForallIn in *. intros. apply Claim; auto.
 Qed.
 
-End TopoBasis.
+
+(* ----------------------------------------------------------------- *)
+(*                       Subspace Topology                           *)
+(* ----------------------------------------------------------------- *)
 
 (* Subspace topology *)
-Definition Subsp {X:Type} (A: Ensemble X): Type := { x: X | A x }.
-
 Section Subspace.
 Context {X:Type}.
 Context (T: Topology X) (A: Ensemble X).
 
-(* {get} serves as an inclusion A->X *)
-Definition subspCorr: Ensemble (Subsp A) -> Ensemble X -> Prop := fun U V => U ~~ InvIm V get.
-Definition subspOpen: Ensemble (Subsp A) -> Prop :=
+Definition subspCorr: Ensemble (Subset A) -> Ensemble X -> Prop :=
+  fun U V => U '= InvIm V incl.
+Definition subspOpen: Ensemble (Subset A) -> Prop :=
   fun U => exists V, open(T) V /\ subspCorr U V.
-Property subspace_proper: properPset subspOpen.
-Proof. unfold properPset, Morphisms.Proper, Morphisms.respectful.
-  unfold subspOpen. intros. unfold ExistsIn. unfold subspCorr. rw_refl. Qed.
-Local Definition subspOpen_: Powerset (Subsp A) := exist _ _ subspace_proper.
 
+Program Definition subspOpen_: Powerset (Subset A) := exist _ subspOpen _.
+Next Obligation. do 3 red. unfold subspOpen, subspCorr. intros. rw_refl. Qed.
+
+(* TODO subspace using basis *)
 Property subspace_topo: isTopology subspOpen.
-Proof with (eauto with sets). split.
+Proof with (eauto with sets).
+  split; unfold subspOpen.
   - (* empty & full *)
-    unfold subspOpen, subspCorr. split.
-    + exists (Empty_set _). split. apply (open_empty_total (getPr T)). symmetry...
-    + exists (Full_set _). split. apply (open_empty_total (getPr T)). symmetry...
+    unfold subspCorr. split.
+    + exists (Empty_set _). split... apply (open_empty_total (getPr T)).
+    + exists (Full_set _). split... apply (open_empty_total (getPr T)).
+
   - (* unions *)
-    unfold subspOpen. intros.
-    set (N := unions U in M, unions V in (open(T) //\\ subspCorr U), V). exists N. split.
-    + apply (open_union (getPr T)). intros ? H1. inversion H1; subst.
-      apply (open_union (getPr T)). intros ? H2. inversion H2; subst. destruct H3...
-    + unfold subspCorr. rewrite <- unions_as_over. unfold N.
-      rewrite invim_unionover. apply unionover_mor. intros U MU.
-      rewrite invim_unionover. apply eq_set_prop. intros. rewrite unionover_iff.
-      unfold ExistsIn. setoid_rewrite intersection_iff. apply H in MU as EV. split; intros H0.
-      * destruct EV. eexists. split... firstorder.
-      * destruct H0 as [? [[H0 H1] H2]]. firstorder.
+    intros. exists (unions U in M, unions V in (open(T) //\\ subspCorr U), V). split.
+    + apply (open_union (getPr T)). apply forall_im_iff. intros ? ?.
+      apply (open_union (getPr T)). apply forall_im_iff. intros ? []...
+    + red. rewrite <- unions_as_over.
+      rewrite invim_unionover. apply unionover_mor. intros U [? []]%H.
+      rewrite invim_unionover. apply same_set_eq.
+      split; [apply inced_forall_then_inced_unionover | apply inc_forall_unionover_iff];
+      try (intros ? []; firstorder). eexists...
+
   - (* intersection *)
-    unfold subspOpen, subspCorr. intros U U' [V [HV1 HV2]] [V' [HV'1 HV'2]]. exists (V //\\ V').
-    split; try (apply (open_intersect (getPr T)); assumption).
-    all_rewrite. symmetry...
+    unfold subspCorr. intros U U' [V [HV1 HV2]] [V' [HV'1 HV'2]].
+    exists (V //\\ V').
+    split; [apply (open_intersect (getPr T)) | all_rewrite ]...
 Qed.
 
-Definition SubspaceT: Topology (Subsp A) := exist _ subspOpen_ subspace_topo.
+Program Definition SubspaceT: Topology (Subset A) := exist _ subspOpen_ subspace_topo.
+
+Lemma open_subsp_open_whole: forall U: Ensemble (Subset A),
+  open(T) A -> open(SubspaceT) U -> open(T) (Im U incl).
+Proof with (eauto with sets).
+  intros. repeat red in H0. destruct H0 as [V []]. unfold subspCorr in H1.
+  assert (Im U incl '= A //\\ V); [rewrite H1|]...
+  eapply (getPr (get T))... apply (open_intersect (getPr T))...
+Qed.
 
 End Subspace.
 
+(* ----------------------------------------------------------------- *)
+(*                        Product Topology                           *)
+(* ----------------------------------------------------------------- *)
+
+Section Product.
+Context {X:Type} {Y:Type}.
+Context (B: Topology X) (C: Topology Y).
+
+Definition prodBasis: PowerEn (X * Y) :=
+  sfor P in open(B) ** open(C), fst P ** snd P.
+
+(*
+Program Definition prodBasis_: Powerset (X * Y) := exist _ prodBasis _.
+Next Obligation. do 3 red. intros. unfold prodBasis. setoid_rewrite im_iff.
+  split. intros [p []]. rewrite <- H1 in *.
+*)
+
+Property prod_basis: isBase prodBasis.
+Proof with (eauto with sets).
+  split; unfold prodBasis.
+  - (* Covers *)
+    exists ( {|' Full_set (X * Y) '|} ).
+    split. intros ? []. econstructor. apply prod_iff. split.
+    apply (open_empty_total(getPr B)). apply (open_empty_total(getPr C)).
+
+End Product.
+
 End ToposSet.
-
-
-
 
