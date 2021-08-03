@@ -44,6 +44,10 @@ Proof.
   intros; intros y. rewrite union_iff. repeat rewrite im_iff.
   setoid_rewrite union_iff. firstorder. Qed.
 
+Lemma im_inc: forall (f: U -> V) (A B: Ensemble U),
+  A <:= B -> Im A f <:= Im B f.
+Proof. intros. intros y. repeat rewrite im_iff. firstorder. Qed.
+
 Lemma forall_im_iff: forall (P: Ensemble U) (f: U -> V) (g: V -> Prop),
   ForallIn (Im P f) g <-> ForallIn P (fun x => g (f x)).
 Proof.
@@ -85,6 +89,10 @@ Lemma invim_union: forall (f: U -> V) (A B: Ensemble V),
   InvIm (A \\// B) f '= InvIm A f \\// InvIm B f.
 Proof. autounfold. setoid_rewrite union_iff. setoid_rewrite invim_iff.
   intros. apply union_iff. Qed.
+
+Lemma invim_inc: forall (f: U -> V) (A B: Ensemble V),
+  A <:= B -> InvIm A f <:= InvIm B f.
+Proof. intros. intros x. repeat rewrite invim_iff. apply H. Qed.
 
 
 Lemma invim_of_im_inc: forall (f: U -> V) (A: Ensemble U),
@@ -144,12 +152,17 @@ Proof. split.
   - intros [i (? & ?)]. exists (F i). eauto using im_def.
 Qed.
 
+(* Sub version of indexed_iff as reverse is too frequently applied *)
+Property indexed_r: forall I U (P: Ensemble I) (F: I -> Ensemble U) (A: Ensemble U),
+  A :in: (indexed i in P, F i) -> exists i: I, (i :in: P) /\ F i '= A.
+Proof. apply indexed_iff. Qed.
 
 #[export]
 Hint Constructors Im InvIm: sets.
 #[export]
-Hint Resolve im_def im_empty invim_empty invim_full
-  invim_intersect invim_union im_identity invim_identity: sets.
+Hint Resolve im_def im_empty im_intersect im_union im_inc
+  invim_empty invim_full invim_intersect invim_union
+  im_identity invim_identity: sets.
 #[export]
 Hint Resolve -> im_iff invim_iff exists_im_iff forall_im_iff  indexed_iff: sets.
 #[export]
@@ -197,7 +210,7 @@ Lemma intersects_as_over: forall U (F: PowerEn U),
 Proof. intros. unfold IntersectOver. apply intersects_mor. apply im_identity. Qed.
 
 
-Lemma im_unionover: forall U V I (f: U -> V) (A: Ensemble I) (P: I -> Ensemble U),
+Lemma im_unionover: forall I U V (f: U -> V) (A: Ensemble I) (P: I -> Ensemble U),
   Im (unions i in A, P i) f '= unions i in A, Im (P i) f.
 Proof with eauto with sets.
   intros. intros y. rewrite im_iff. setoid_rewrite unionover_iff. split.
@@ -205,11 +218,28 @@ Proof with eauto with sets.
   - intros [? [? [? []]%im_iff]]; subst. eexists...
 Qed.
 
-Lemma im_intersectover: forall U V I (f: U -> V) (A: Ensemble I) (P: I -> Ensemble U),
+Lemma im_intersectover: forall I U V (f: U -> V) (A: Ensemble I) (P: I -> Ensemble U),
   Im (intersects i in A, P i) f <:= intersects i in A, Im (P i) f.
 Proof.
   intros. intros y. rewrite im_iff. setoid_rewrite intersectover_iff.
   intros [? []]; subst. auto with sets. Qed.
+
+Lemma invim_unionover: forall I U V (A: Ensemble I) (P: I -> Ensemble V) (f: U -> V),
+  InvIm (unions i in A, P i) f '= unions i in A, InvIm (P i) f.
+Proof.
+  intros. autounfold. intros.
+  rewrite invim_iff. repeat rewrite unionover_iff. apply exists_mor.
+  red. intros i Ai. rewrite invim_iff. reflexivity.
+Qed.
+
+Lemma invim_intersectover: forall I U V (A: Ensemble I) (P: I -> Ensemble V) (f: U -> V),
+  InvIm (intersects i in A, P i) f '= intersects i in A, InvIm (P i) f.
+Proof.
+  intros. autounfold. intros.
+  rewrite invim_iff. repeat rewrite intersectover_iff. apply forall_mor.
+  red. intros i Ai. rewrite invim_iff. reflexivity.
+Qed.
+
 
 Lemma unions_unionover: forall U I (A: Ensemble I) (F: I -> PowerEn U),
   Unions (unions i in A, F i) '= unions i in A, Unions (F i).
@@ -222,8 +252,19 @@ Proof with (eauto with sets).
 Qed.
 (* NOTE: Any inclusion for intersects & intersectover does not hold *)
 
+
+
 Section OverOne.
 Context (U:Type) (I:Type) (P: Ensemble I) (F: I -> Ensemble U).
+
+Property unionover_inc_one: forall i: I,
+  i :in: P -> F i <:= unions i in P, F i.
+Proof. intros. apply unions_inc_one. apply im_def. assumption. Qed.
+
+Property intersectover_inced_one: forall i: I,
+  i :in: P -> F i =:> intersects i in P, F i.
+Proof. intros. apply intersects_inced_one. apply im_def. assumption. Qed.
+
 
 Lemma inc_forall_unionover_iff: forall (A: Ensemble U),
   ForallIn P (fun i => A =:> F i) <-> A =:> unions i in P, F i.
@@ -292,22 +333,6 @@ Lemma intersects_exch: forall U I J (A: Ensemble I) (B: Ensemble J)
 Proof. split; apply intersects_exch_. Qed.
 
 
-Lemma invim_unionover: forall I U V (A: Ensemble I) (P: I -> Ensemble V) (f: U -> V),
-  InvIm (unions i in A, P i) f '= unions i in A, InvIm (P i) f.
-Proof.
-  intros. autounfold. intros.
-  rewrite invim_iff. repeat rewrite unionover_iff. apply exists_mor.
-  red. intros i Ai. rewrite invim_iff. reflexivity.
-Qed.
-
-Lemma invim_intersectover: forall I U V (A: Ensemble I) (P: I -> Ensemble V) (f: U -> V),
-  InvIm (intersects i in A, P i) f '= intersects i in A, InvIm (P i) f.
-Proof.
-  intros. autounfold. intros.
-  rewrite invim_iff. repeat rewrite intersectover_iff. apply forall_mor.
-  red. intros i Ai. rewrite invim_iff. reflexivity.
-Qed.
-
 (* ----------------------------------------------------------------- *)
 (*                              Subsets                              *)
 (* ----------------------------------------------------------------- *)
@@ -337,7 +362,10 @@ End Subset.
 #[export]
 Hint Unfold UnionOver IntersectOver Subset incl: sets.
 #[export]
-Hint Resolve unions_exch intersects_exch invim_unionover invim_intersectover
+Hint Resolve unions_exch intersects_exch
+  im_unionover im_intersectover
+  invim_unionover invim_intersectover
+  unionover_inc_one intersectover_inced_one
   incl_im_of_invim: sets.
 #[export]
 Hint Resolve -> unionover_iff intersectover_iff: sets.

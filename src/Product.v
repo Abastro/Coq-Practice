@@ -46,6 +46,12 @@ Lemma full_prod: Full_set U ** Full_set V '= Full_set (U * V).
 Proof. intros []. rewrite prod_iff. split; repeat constructor. Qed.
 
 
+(* Sufficient condition of product inclusion *)
+Lemma prod_incl_suff: forall (A C: Ensemble U) (B D: Ensemble V),
+  A <:= C -> B <:= D -> A ** B <:= C ** D.
+Proof. intros * H1 H2. intros (x, y) (Hx & Hy)%prod_iff. apply prod_iff. auto with sets. Qed.
+
+
 Lemma im_fst_prod: forall (A: Ensemble U) (B: Ensemble V),
   Inhabited _ B -> Im (A ** B) fst '= A.
 Proof. intros ? ? [y ?]. intros x. split.
@@ -66,6 +72,9 @@ Proof. intros ? (x,y). rewrite invim_iff. rewrite prod_iff. firstorder. construc
 Lemma invim_snd_prod: forall (B: Ensemble V), InvIm B snd '= Full_set U ** B.
 Proof. intros ? (x,y). rewrite invim_iff. rewrite prod_iff. firstorder. constructor. Qed.
 
+Lemma prod_invim_split: forall (A: Ensemble U) (B: Ensemble V),
+  InvIm A fst //\\ InvIm B snd '= A ** B.
+Proof. intros * (x,y). rewrite intersection_iff, prod_iff, invim_iff, invim_iff. firstorder. Qed.
 
 Lemma prod_intersect_exch: forall (A C: Ensemble U) (B D: Ensemble V),
   (A ** B) //\\ (C ** D) '= (A //\\ C) ** (B //\\ D).
@@ -78,8 +87,8 @@ End AProd.
 #[export]
 Hint Constructors Product: sets.
 #[export]
-Hint Resolve empty_l_prod empty_r_prod full_prod
-  im_fst_prod im_snd_prod invim_fst_prod invim_snd_prod
+Hint Resolve empty_l_prod empty_r_prod full_prod  prod_incl_suff
+  im_fst_prod im_snd_prod invim_fst_prod invim_snd_prod  prod_invim_split
   prod_intersect_exch: sets.
 #[export]
 Hint Resolve -> prod_iff: sets.

@@ -151,6 +151,13 @@ Proof. do 3 red. firstorder. Qed.
 Definition asProper {U:Type} (P: PowerEn U): Powerset U :=
   exist _ _ (properForm_spec U P).
 
+Add Parametric Morphism U: (@properForm U)
+  with signature eqs ==> eqs ==> iff as proper_mor.
+Proof. unfold properForm. firstorder. Qed.
+Add Parametric Morphism U F: (In (Ensemble U) (properForm F))
+  with signature eqs ==> iff as proper_in_mor.
+Proof. unfold In. firstorder. Qed.
+
 
 (* Powerset on certain set *)
 Definition PSeton {U:Type} (A: Ensemble U): PowerEn U := fun V => V <:= A.
