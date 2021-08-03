@@ -132,10 +132,17 @@ Lemma invim_identity: forall U (A: Ensemble U), InvIm A id '= A.
 Proof. autounfold. intros. setoid_rewrite invim_iff. reflexivity. Qed.
 
 
-(* Indexed, Proper form of Image of Power set *)
+(* Indexed family, Proper form of Image of Power set *)
 
 Notation "'indexed' i 'in' P , e" := (properForm (Im P (fun i => e)))
   (at level 90, i binder, right associativity).
+
+Property indexed_iff: forall I U (P: Ensemble I) (F: I -> Ensemble U) (A: Ensemble U),
+  A :in: (indexed i in P, F i) <-> exists i: I, (i :in: P) /\ F i '= A.
+Proof. split.
+  - intros [? ([i []]%im_iff & ?)]; subst. eauto.
+  - intros [i (? & ?)]. exists (F i). eauto using im_def.
+Qed.
 
 
 #[export]
@@ -144,9 +151,9 @@ Hint Constructors Im InvIm: sets.
 Hint Resolve im_def im_empty invim_empty invim_full
   invim_intersect invim_union im_identity invim_identity: sets.
 #[export]
-Hint Resolve -> im_iff invim_iff exists_im_iff forall_im_iff: sets.
+Hint Resolve -> im_iff invim_iff exists_im_iff forall_im_iff  indexed_iff: sets.
 #[export]
-Hint Resolve <- im_iff invim_iff exists_im_iff forall_im_iff: sets.
+Hint Resolve <- im_iff invim_iff exists_im_iff forall_im_iff  indexed_iff: sets.
 
 (* ----------------------------------------------------------------- *)
 (*                      UnionOver / IntersectOver                    *)
