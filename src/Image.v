@@ -113,6 +113,16 @@ Lemma surj_im_of_invim_eq: forall (f: U -> V) (B: Ensemble V),
 Proof. intros. apply same_set_eq. split; [apply im_of_invim_inc|].
   intros y ?. specialize (H y) as []; subst. apply im_def, invim_iff. trivial. Qed.
 
+
+Lemma invim_compl: forall (f: U -> V) (P: Ensemble V),
+  ~! InvIm P f '= InvIm (~! P) f.
+Proof. split.
+  - intros H. unfold Complement in H. red in H. rewrite invim_iff in H.
+    apply invim_iff. tauto.
+  - intros H%invim_iff C%invim_iff. contradiction.
+Qed.
+
+
 End Mapping.
 
 Add Parametric Morphism U V `(UsualSetoid V): (@Im U V)
@@ -142,7 +152,14 @@ Proof. autounfold. intros. setoid_rewrite invim_iff. reflexivity. Qed.
 
 (* Indexed family, Proper form of Image of Power set *)
 
-Notation "'indexed' i 'in' P , e" := (properForm (Im P (fun i => e)))
+Definition Indexed {I U:Type} (P: Ensemble I) (F: I -> Ensemble U): PowerEn U :=
+  properForm (Im P F).
+
+Property indexed_spec: forall I U (P: Ensemble I) (F: I -> Ensemble U),
+  properPset (Indexed P F).
+Proof. unfold Indexed. intros. apply properForm_spec. Qed.
+
+Notation "'indexed' i 'in' P , e" := (Indexed P (fun i => e))
   (at level 90, i binder, right associativity).
 
 Property indexed_iff: forall I U (P: Ensemble I) (F: I -> Ensemble U) (A: Ensemble U),
@@ -152,17 +169,37 @@ Proof. split.
   - intros [i (? & ?)]. exists (F i). eauto using im_def.
 Qed.
 
+Property indexed_def: forall I U (P: Ensemble I) (F: I -> Ensemble U) i,
+  i :in: P -> F i :in: indexed i in P, F i.
+Proof. intros. apply indexed_iff. eauto with sets. Qed.
+
+
 (* Sub version of indexed_iff as reverse is too frequently applied *)
 Property indexed_r: forall I U (P: Ensemble I) (F: I -> Ensemble U) (A: Ensemble U),
   A :in: (indexed i in P, F i) -> exists i: I, (i :in: P) /\ F i '= A.
 Proof. apply indexed_iff. Qed.
 
+Lemma indexed_inced_proper: forall I U (P: Ensemble I) (F: I -> Ensemble U) (A: PowerEn U),
+  properPset A -> ForallIn P (fun i => F i :in: A) -> (indexed i in P, F i) <:= A.
+Proof. intros. intros x [i []]%indexed_r. firstorder. Qed.
+
+Add Parametric Morphism I U: (@Indexed I U)
+  with signature eqs ==> eqs ==> eqs as indexed_mor.
+Proof.
+  intros. apply same_set_eq. split.
+  all: apply indexed_inced_proper; try apply indexed_spec.
+  all: intros i ?; apply indexed_iff. all: exists i. all: firstorder.
+Qed.
+
+#[export]
+Hint Unfold Indexed: sets.
 #[export]
 Hint Constructors Im InvIm: sets.
 #[export]
 Hint Resolve im_def im_empty im_intersect im_union im_inc
   invim_empty invim_full invim_intersect invim_union
-  im_identity invim_identity: sets.
+  im_identity invim_identity
+  indexed_spec indexed_def indexed_inced_proper: sets.
 #[export]
 Hint Resolve -> im_iff invim_iff exists_im_iff forall_im_iff  indexed_iff: sets.
 #[export]
@@ -202,12 +239,12 @@ Proof. autounfold. repeat setoid_rewrite intersectover_iff. intros.
 
 
 Lemma unions_as_over: forall U (F: PowerEn U),
-  (unions A in F, A) '= Unions F.
-Proof. intros. unfold UnionOver. apply unions_mor. apply im_identity. Qed.
+  Unions F '= (unions A in F, A).
+Proof. intros. unfold UnionOver. apply unions_mor. symmetry. apply im_identity. Qed.
 
 Lemma intersects_as_over: forall U (F: PowerEn U),
-  (intersects A in F, A) '= Intersects F.
-Proof. intros. unfold IntersectOver. apply intersects_mor. apply im_identity. Qed.
+  Intersects F '= (intersects A in F, A).
+Proof. intros. unfold IntersectOver. apply intersects_mor. symmetry. apply im_identity. Qed.
 
 
 Lemma im_unionover: forall I U V (f: U -> V) (A: Ensemble I) (P: I -> Ensemble U),
@@ -252,6 +289,17 @@ Proof with (eauto with sets).
 Qed.
 (* NOTE: Any inclusion for intersects & intersectover does not hold *)
 
+Lemma set_unionover: forall (U:Type) (A: Ensemble U),
+  A '= unions x in A, {' x '}.
+Proof. intros. intros x. rewrite unionover_iff. split; firstorder. destruct H0. trivial. Qed.
+
+Property unionover_inc_lift: forall (U:Type) (I:Type) (P: Ensemble I) (F G: I -> Ensemble U),
+  ForallIn P (fun i => F i <:= G i) -> (unions i in P, F i) <:= (unions i in P, G i).
+Proof. intros * H x [i []]%unionover_iff. apply unionover_iff. exists i. firstorder. Qed.
+
+Property intersectover_inc_lift: forall (U:Type) (I:Type) (P: Ensemble I) (F G: I -> Ensemble U),
+  ForallIn P (fun i => F i <:= G i) -> (intersects i in P, F i) <:= (intersects i in P, G i).
+Proof. intros * H x Hx%intersectover_iff. apply intersectover_iff. firstorder. Qed.
 
 
 Section OverOne.
@@ -291,6 +339,30 @@ Lemma inc_forall_then_inc_intersectover: forall (A: Ensemble U),
 Proof with (auto with sets).
   intros ? [] ?. apply inc_forall_then_inc_intersects... exists (F x)...
 Qed.
+
+
+Lemma unionover_compl:
+  ~! (unions i in P, F i) '= intersects i in P, (~! F i).
+Proof. split.
+  - intros H. apply intersectover_iff. intros i Hi C.
+    apply H. apply unionover_iff. exists i. tauto.
+  - intros H%intersectover_iff []%unionover_iff. firstorder.
+Qed.
+
+(* Complement over intersection requires excluded middle *)
+Lemma intersectover_compl:
+  ExcludedMiddle -> ~! (intersects i in P, F i) '= unions i in P, (~! F i).
+Proof. intros * EM. split.
+  - intros H. unfold Complement in H. red in H.
+    rewrite intersectover_iff in H. rewrite unionover_iff.
+    destruct (EM (ExistsIn P (fun i => x :in: ~! F i))). auto.
+    exfalso. apply H. intros i Hi.
+    destruct (EM (x :in: F i)). auto.
+    exfalso. apply H0. exists i. tauto.
+  - intros [i []]%unionover_iff C%intersectover_iff. firstorder.
+Qed.
+
+
 End OverOne.
 
 

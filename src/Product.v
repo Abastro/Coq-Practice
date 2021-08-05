@@ -82,8 +82,30 @@ Proof. intros. intros (x, y).
   rewrite intersection_iff. repeat rewrite prod_iff.
   repeat rewrite intersection_iff. tauto. Qed.
 
+(* Subset and Product *)
+Program Definition ps_to_sp {A: Ensemble U} {B: Ensemble V}:
+  Subset A * Subset B -> Subset (A ** B) :=
+  fun p => let (x, y) := p in exist _ (get x, get y) _.
+Next Obligation. apply prod_iff. split. apply (getPr x). apply (getPr y). Qed.
+
+Program Definition sp_to_ps {A: Ensemble U} {B: Ensemble V}:
+  Subset (A ** B) -> Subset A * Subset B :=
+  fun p => (exist _ (fst (get p)) _, exist _ (snd (get p)) _).
+Next Obligation. assert (P := getPr p). destruct (get p). apply prod_iff in P. firstorder. Qed.
+Next Obligation. assert (P := getPr p). destruct (get p). apply prod_iff in P. firstorder. Qed.
+
+Property prod_sub_id: forall A B (x: Subset A) (y: Subset B),
+  let (x', y') := sp_to_ps (ps_to_sp (x, y)) in get x' = get x /\ get y' = get y.
+Proof. intros. simpl. intuition. Qed.
+
+Property sub_prod_id: forall A B (t: Subset (A ** B)),
+  get (ps_to_sp (sp_to_ps t)) = get t.
+Proof. intros. destruct t as [(x, y) ?]. simpl. reflexivity. Qed.
+
 End AProd.
 
+#[export]
+Hint Unfold ps_to_sp sp_to_ps: sets.
 #[export]
 Hint Constructors Product: sets.
 #[export]

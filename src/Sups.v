@@ -316,7 +316,7 @@ Hint Resolve <- infsup_gives_bnds_range: ordered_type.
 
 (* Limits *)
 Definition SetLimit A l := forall a b: U,
-  l :in: (' a, b ') -> Inhabited _ (((' a, b ') \\ {|' l '|} ) //\\ A).
+  l :in: (' a, b ') -> Inhabited _ (((' a, b ') \\ {' l '} ) //\\ A).
 
 
 (* Completeness *)

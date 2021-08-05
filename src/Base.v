@@ -2,6 +2,19 @@ Require Import Basics.
 Require Import Setoid.
 Require Import RelationClasses.
 
+Require Export ChoiceFacts.
+
+(* Basic Facts *)
+Definition DNegationElim := forall P, ~~P -> P.
+
+Theorem em_dne: ExcludedMiddle <-> DNegationElim.
+Proof.
+  split.
+  - intros EM P H. destruct (EM P). auto. contradiction.
+  - intros DNE P. apply DNE. intros H. tauto.
+Qed.
+
+
 (* Rewrite tactics *)
 (* Setoid_rewrites all occurrences, until it meets True. Renames hypothesis. *)
 Ltac all_rewrite := let BLOCK := True in

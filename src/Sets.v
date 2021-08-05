@@ -14,7 +14,10 @@ From Practice Require Import Base.
 Module Set_Extras.
 
 Notation "x ':in:' A" := (In _ A x) (at level 70, no associativity).
-Notation "{|' x '|}" := (Singleton _ x) (at level 50).
+Notation "{' x '}" := (Singleton _ x) (at level 50).
+Notation "'{'' x , .. , y , z ''}'" :=
+  (Union _ (Singleton _ x) .. (Union _ (Singleton _ y) (Singleton _ z)) ..)
+  (at level 50, no associativity).
 Notation "A '//\\' B" := (Intersection _ A B) (at level 60, right associativity).
 Notation "A '\\//' B" := (Union _ A B) (at level 60, right associativity).
 Notation "'~!' A" := (Complement _ A) (at level 20).
@@ -119,6 +122,35 @@ Lemma union_incl_distr: forall A B C D: Ensemble U,
 Proof. intros. apply union_incl_split.
   split; etransitivity; eauto; [apply union_incl | apply union_incl2]. Qed.
 
+(* Properties over complement *)
+Property full_compl: ~! Full_set U '= Empty_set U.
+Proof. split; intros []. constructor. Qed.
+
+Property empty_compl: ~! Empty_set U '= Full_set U.
+Proof. split. constructor. intros ? []. Qed.
+
+Lemma union_compl: forall A B: Ensemble U, ~! (A \\// B) '= (~! A) //\\ (~! B).
+Proof. split.
+  - intros H. rewrite intersection_iff. split; intros C;
+    [ apply (union_incl _ B) in C | apply (union_incl2 A _) in C ]; contradiction.
+  - intros [H1 H2]%intersection_iff C%union_iff. firstorder.
+Qed.
+
+Property intersection_compl: forall A B: Ensemble U,
+  ExcludedMiddle -> ~! (A //\\ B) '= (~! A) \\// (~! B).
+Proof. intros * EM. unfold Complement. split.
+  - intros H. red in H. rewrite intersection_iff in H. rewrite union_iff.
+    destruct (EM (x :in: A)); tauto.
+  - intros H%union_iff C%intersection_iff. firstorder.
+Qed.
+
+Property compl_compl: forall A: Ensemble U,
+  ExcludedMiddle -> ~! (~! A) '= A.
+Proof. intros * EM. intros x. split.
+  - apply em_dne. auto.
+  - unfold Complement, In. auto.
+Qed.
+
 End SetOps.
 
 (* Qualification over sets *)
@@ -152,7 +184,7 @@ Definition asProper {U:Type} (P: PowerEn U): Powerset U :=
   exist _ _ (properForm_spec U P).
 
 Add Parametric Morphism U: (@properForm U)
-  with signature eqs ==> eqs ==> iff as proper_mor.
+  with signature eqs ==> eqs as proper_mor.
 Proof. unfold properForm. firstorder. Qed.
 Add Parametric Morphism U F: (In (Ensemble U) (properForm F))
   with signature eqs ==> iff as proper_in_mor.
@@ -194,13 +226,37 @@ Property intersects_inced_one: forall U (A: Ensemble U) (F: PowerEn U),
 Proof. red. setoid_rewrite intersects_iff. firstorder. Qed.
 
 
-Lemma unions_empty: forall X,
-  Unions (Empty_set (Ensemble X)) '= Empty_set X.
+Lemma unions_empty: forall U,
+  Unions (Empty_set (Ensemble U)) '= Empty_set U.
 Proof. autounfold. setoid_rewrite unions_iff. firstorder. Qed.
 
-Lemma intersects_empty: forall X,
-  Intersects (Empty_set (Ensemble X)) '= Full_set X.
+Lemma intersects_empty: forall U,
+  Intersects (Empty_set (Ensemble U)) '= Full_set U.
 Proof. autounfold. setoid_rewrite intersects_iff. firstorder. constructor. Qed.
+
+Lemma unions_single: forall U (A: Ensemble U),
+  Unions ( {' A '} ) '= A.
+Proof. autounfold. intros. rewrite unions_iff.
+  split. intros [? ([] & ?)]. auto. intros. eexists. split; eauto with sets. Qed.
+
+Lemma intersects_single: forall U (A: Ensemble U),
+  Intersects ( {' A '} ) '= A.
+Proof. autounfold. intros. rewrite intersects_iff.
+  split. firstorder. intros ? ? []. auto. Qed.
+
+Lemma unions_couple: forall U (A B: Ensemble U),
+  Unions ( {' A, B '} ) '= A \\// B.
+Proof. autounfold. intros. rewrite unions_iff, union_iff.
+  split. intros [? [[? []|? []] ?]]; firstorder.
+  intros [|]; eexists; apply and_comm; split; eauto with sets.
+Qed.
+
+Lemma intersects_couple: forall U (A B: Ensemble U),
+  Intersects ( {' A, B '} ) '= A //\\ B.
+Proof. autounfold. intros. rewrite intersects_iff, intersection_iff.
+  split. intros. split; apply H; auto with sets.
+  intros []. intros ? [? []|? []]; auto.
+Qed.
 
 
 Lemma inc_forall_unions_iff: forall U (A: Ensemble U) (F: PowerEn U),
@@ -255,7 +311,8 @@ Hint Resolve included_full
   union_comm union_assoc intersection_comm intersection_assoc
   union_incl union_incl2 intersection_incl intersection_incl2
   union_incl_distr intersection_incl_distr      properForm_spec
-  unions_inc_one intersects_inced_one unions_empty intersects_empty: sets.
+  unions_inc_one intersects_inced_one
+  unions_empty intersects_empty unions_single intersects_single: sets.
 #[export]
 Hint Resolve -> same_set_eq union_incl_split intersection_incl_split
   included_union included_intersection unions_iff intersects_iff: sets.
