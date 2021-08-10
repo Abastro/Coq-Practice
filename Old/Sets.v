@@ -5,7 +5,7 @@ Require Import RelationClasses.
 Require Import Ensembles.
 Require Import Constructive_sets.
 
-From Practice Require Import Base.
+From Practice Require Import Old.Base.
 
 (* ----------------------------------------------------------------- *)
 (*        Extra Set theoretical logic to the barebone Ensembles      *)
@@ -14,10 +14,10 @@ From Practice Require Import Base.
 Module Set_Extras.
 
 Notation "x ':in:' A" := (In _ A x) (at level 70, no associativity).
-Notation "{' x '}" := (Singleton _ x) (at level 50).
+Notation "'{'' x ''}'" := (Singleton _ x) (at level 0).
 Notation "'{'' x , .. , y , z ''}'" :=
   (Union _ (Singleton _ x) .. (Union _ (Singleton _ y) (Singleton _ z)) ..)
-  (at level 50, no associativity).
+  (at level 0, no associativity).
 Notation "A '//\\' B" := (Intersection _ A B) (at level 60, right associativity).
 Notation "A '\\//' B" := (Union _ A B) (at level 60, right associativity).
 Notation "'~!' A" := (Complement _ A) (at level 20).

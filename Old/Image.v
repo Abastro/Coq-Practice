@@ -5,8 +5,8 @@ Require Import RelationClasses.
 Require Import Ensembles.
 Require Import Constructive_sets.
 
-From Practice Require Import Base.
-From Practice Require Import Sets.
+From Practice Require Import Old.Base.
+From Practice Require Import Old.Sets.
 
 (* ----------------------------------------------------------------- *)
 (*                    Image, Inverse Image(PreImage)                 *)
@@ -427,7 +427,7 @@ Qed.
 (* The lemma below requires proper set C over the setoid U. *)
 (* Lemma incl_invim_of_im: forall C, InvIm (Im C incl) incl '= C.
 Proof. intros. intros x. rewrite invim_iff. split; auto with sets.
-  intros [x' []]%im_inv. *)
+  intros [x' []]%im_iff. destruct x, x'. simpl in *. subst. auto.*)
 
 End Subset.
 

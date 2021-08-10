@@ -8,5 +8,6 @@
 
 *.cache
 *.d
-Makefile
-Makefile.conf
+
+CoqMakefile
+CoqMakefile.conf

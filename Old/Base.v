@@ -88,7 +88,7 @@ Definition get {U:Type} {P: U -> Prop} (pf: sig P): U
 Definition getPr {U:Type} {P: U -> Prop} (pf: sig P): P (get pf)
   := proj2_sig pf.
 Add Parametric Morphism U (P: U -> Prop) `(Setoid U): (@get U P)
-  with signature eqs ==> eqs as get_mor.
+  with signature eqs ==> eqs as  get_mor.
 Proof. auto. Qed.
 
 (* Injecitivity and Surjectivity *)

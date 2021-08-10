@@ -5,9 +5,9 @@ Require Import RelationClasses.
 Require Import Ensembles.
 Require Import Constructive_sets.
 
-From Practice Require Import Base.
-From Practice Require Import Sets.
-From Practice Require Import Image.
+From Practice Require Import Old.Base.
+From Practice Require Import Old.Sets.
+From Practice Require Import Old.Image.
 
 (* Cartesian Product *)
 Module Products.

@@ -8,8 +8,8 @@ Require Import Constructive_sets.
 Require Import Orders.
 Require Import OrdersTac.
 
-From Practice Require Import Base.
-From Practice Require Import Sets.
+From Practice Require Import Old.Base.
+From Practice Require Import Old.Sets.
 
 Module Type PartialOrder := StrOrder <+ HasLe <+ LeIsLtEq.
 

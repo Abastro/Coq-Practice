@@ -8,10 +8,10 @@ Require Import Constructive_sets.
 Require Import Fin.
 Require List.
 
-From Practice Require Import Base.
-From Practice Require Import Sets.
-From Practice Require Import Image.
-From Practice Require Import Product.
+From Practice Require Import Old.Base.
+From Practice Require Import Old.Sets.
+From Practice Require Import Old.Image.
+From Practice Require Import Old.Product.
 
 Definition Fin := Fin.t.
 
@@ -468,6 +468,68 @@ Theorem prod_subsp_exch: forall X Y (S: Topology X) (T: Topology Y),
   forall (A: Ensemble X) (B: Ensemble Y),
   open (ProductT (SubspaceT S A) (SubspaceT T B)) '= open (SubspaceT (ProductT S T) (A ** B)).
 *)
+
+
+(* ----------------------------------------------------------------- *)
+(*                 Basic Structure in a Topology                     *)
+(* ----------------------------------------------------------------- *)
+
+Section TopoStr.
+Context {X:Type} (T: Topology X).
+
+Definition Interior (A: Ensemble X): Ensemble X :=
+  Unions (open(T) //\\ PSeton A).
+Definition Closure (A: Ensemble X): Ensemble X :=
+  Intersects (closed(T) //\\ Included _ A).
+
+Property interior_in: forall A, Interior A <:= A.
+Proof. intros. apply inc_forall_unions_iff. intros U.
+  rewrite intersection_iff. firstorder. Qed.
+
+Property closure_out: forall A, Closure A =:> A.
+Proof. intros. apply inced_forall_intersects_iff. intros E.
+  rewrite intersection_iff. firstorder. Qed.
+
+Property interior_eq_iff: forall A, open(T) A <-> Interior A '= A.
+Proof with (eauto with sets). split.
+  - intros H. apply same_set_eq. split; try apply interior_in.
+    apply unions_inc_one...
+  - intros H%symmetry. eapply proper_open... apply unions_open.
+    intros x. rewrite intersection_iff. firstorder.
+Qed.
+
+Property closure_eq_iff: forall A, ExcludedMiddle -> closed(T) A <-> Closure A '= A.
+Proof with (eauto with sets). intros * EM. split.
+  - intros H. apply same_set_eq. split; try apply closure_out.
+    apply intersects_inced_one...
+  - intros H%symmetry. eapply proper_closed... apply intersects_closed...
+    intros x. rewrite intersection_iff. firstorder.
+Qed.
+
+Property interior_open: forall A, open(T) (Interior A).
+Proof. intros. apply unions_open. intros U.
+  rewrite intersection_iff. firstorder. Qed.
+
+Property closure_closed: forall A, ExcludedMiddle -> closed(T) (Closure A).
+Proof. intros * EM. apply intersects_closed. auto. intros E.
+  rewrite intersection_iff. firstorder. Qed.
+
+End TopoStr.
+
+Lemma subspace_closure: forall X T (Y: Ensemble X) (A: Ensemble (Subset Y)),
+  ExcludedMiddle -> Closure(SubspaceT(T) Y) A '= InvIm (Closure(T) (Im A incl)) incl.
+Proof with (auto with sets).
+  intros * EM. apply same_set_eq. split.
+  - apply intersects_inced_one. split.
+    apply closed_subsp_iff... eexists. split... apply closure_closed...
+    unfold In. intros x H. apply invim_iff. apply closure_out...
+  - set (B := Closure (SubspaceT T Y) A).
+    assert (H: closed(SubspaceT T Y) B). apply closure_closed...
+    apply closed_subsp_iff in H... destruct H as [B' (H & E)].
+    rewrite <- E. apply invim_inc. apply intersects_inced_one.
+    split... unfold In. intros ? [? ? ? ->]. apply invim_iff.
+    rewrite E. apply closure_out...
+Qed.
 
 
 
