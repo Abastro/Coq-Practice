@@ -95,8 +95,8 @@ Instance decpr1_op2 {U} F `{DecOp2 F} (P Q: U -> Prop) `(DecPred1 U P) `(DecPred
 Proof. intros ?. auto. Qed.
 
 (* Specialize to Dec *)
-Instance dec_decpr {U} P (x: U) `{DecPred1 U P}: (Dec (P x)).
-Proof. apply dec_pr1. Qed.
+(* Instance dec_decpr {U} P (x: U) `{DecPred1 U P}: (Dec (P x)).
+Proof. apply dec_pr1. Qed. *)
 
 
 (* Marks witness-search as decidable *)
@@ -157,10 +157,6 @@ Proof. induction l. auto. simpl. apply DecExists. intros ?. apply IHl. apply H. 
 Instance decp_forall_l (l: Tlist) P `{DecPred l P}: Dec (predicate_all l P).
 Proof. induction l. auto. simpl. apply DecForall. intros ?. apply IHl. apply H. Qed.
 
-
-#[export]
-Hint Unfold predicate_all pointwise_ext pointwise_ext2
-  Dec DecP1 DecP2 DecOp1 DecOp2 DecPred1 DecPred: sets.
 
 
 (* ----------------------------------------------------------------- *)
