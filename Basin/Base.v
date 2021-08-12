@@ -2,6 +2,7 @@ Require Export Basics.
 Require Export Setoid.
 Require Export SetoidClass.
 Require Export RelationClasses.
+Require List.
 
 (* Rewrite tactics *)
 (* Setoid_rewrites all occurrences, until it meets True. Renames hypothesis. *)
@@ -105,3 +106,49 @@ Notation "'[:' U , .. , V ':]'" := (Tcons U .. (Tcons V Tnil) ..)
 
 #[export]
 Hint Unfold generalize_all pointwise_ext pointwise_ext2: core.
+
+
+Module TFAE.
+
+Import List.
+Import ListNotations.
+
+Definition TFAE (l: list Prop) : Prop :=
+  forall n m : nat, nth n l False -> nth m l True.
+
+Fixpoint chain_impl (P: Prop) (l: list Prop): Prop :=
+  match l with
+  | Q :: l' => (P -> Q) /\ chain_impl Q l'
+  | _ => True
+  end.
+
+Lemma tfae_by_chain: forall P (l: list Prop),
+  chain_impl P l ->
+  (nth (pred (length l)) l False -> P) -> TFAE (P :: l).
+Proof.
+  intros *. generalize dependent P.
+  induction l as [| Q l'].
+  - intros ? _ _ n m. destruct n. destruct m. trivial.
+    + simpl. destruct m; trivial.
+    + simpl. destruct n; contradiction.
+  - intros ? [HF HC] HL n m.
+    assert (IH: TFAE (Q :: l')). {
+      apply IHl'. apply HC. simpl in HL.
+      destruct l'; firstorder.
+    }
+    destruct n, m; trivial.
+    + intros H0%HF. apply (IH 0 m). trivial.
+    + intros H0%(IH n (length l')). apply HL.
+      rewrite nth_indep with (d' := True). trivial. auto.
+    + apply IH.
+Qed.
+
+Ltac tfae_chain := apply tfae_by_chain;
+  unfold chain_impl, nth, length, pred; repeat apply conj; trivial.
+
+Lemma tfae_then_any: forall (n m: nat) (l: list Prop),
+  TFAE l -> nth n l False -> nth m l True.
+Proof. firstorder. Qed.
+
+
+End TFAE.
