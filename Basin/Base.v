@@ -28,12 +28,14 @@ Property setoid_trans (U:Type) `(Setoid U): forall x y z, x == y -> y == z -> x 
 Proof. etransitivity; eauto. Qed.
 
 #[export]
-Hint Resolve setoid_refl setoid_sym setoid_trans: core.
+Hint Immediate setoid_refl setoid_sym setoid_trans: core.
 
 
 (* Setoid for leibniz equality *)
 
 Class UsualSetoid (U:Type) := {}.
+
+Instance usual_prod U V `(UsualSetoid U) `(UsualSetoid V): UsualSetoid (U * V). Qed.
 
 Program Instance setoid_usual U `(UsualSetoid U): Setoid U := {
   equiv := eq

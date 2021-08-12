@@ -7,6 +7,11 @@ Class Dec (P: Prop) :=
 
 Definition decide (P: Prop) `{Dec P}: decidable P := dec_prop.
 
+Tactic Notation "decides" constr(x) :=
+  destruct (decide x).
+Tactic Notation "decides" constr(x) "as" simple_intropattern(y) :=
+  destruct (decide x) as y.
+
 Instance decT: Dec True.
 Proof. apply dec_True. Qed.
 
@@ -69,6 +74,9 @@ Class UsualEqDec U := {
 
 (* Notation to consider implication as an operator *)
 Notation "A '-> B" := (impl A B) (at level 100, right associativity).
+
+#[export]
+Hint Unfold impl: core.
 
 
 (* Typeclass mechanics for decidability of 1-predicate *)
@@ -292,3 +300,29 @@ Proof.
 Qed.
 
 End ProofIrrelevance.
+
+Lemma subs_eq_iff: forall U (P: U -> Prop) `(DecPred1 _ P) (x y: sig P),
+  get x = get y <-> x = y.
+Proof. intros. split.
+  - intros E. destruct x as [x' p], y as [y' q]. simpl in E; subst.
+    f_equal. apply classical_proof_irrelevance. apply H.
+  - intros ?. f_equal. trivial.
+Qed.
+
+(* Proof irrelevance gives usual setoid for subset *)
+Instance usual_subset U `(UsualSetoid U) (P: U -> Prop): UsualSetoid {x | P x}. Qed.
+
+Program Instance usual_dec_subset U `(UsualEqDec U) (P: U -> Prop) `(DecPred1 _ P):
+  UsualEqDec {x | P x}.
+Next Obligation with trivial.
+  intros ? ?. simpl. red. rewrite <- subs_eq_iff...
+  pose (D := decide (get x == get y))...
+Qed.
+
+
+Program Instance usual_dec_prod U V `(UsualEqDec U) `(UsualEqDec V):
+  UsualEqDec (U * V).
+Next Obligation.
+  intros (x, x') (y, y'). simpl. unfold decidable.
+  rewrite pair_equal_spec. pose proof (decide (x == y /\ x' == y')). trivial.
+Qed.
