@@ -74,7 +74,21 @@ Hint Unfold setoid_usual setoid_function setoid_sub: core.
 Hint Resolve usualeq_spec: core.
 
 
-(* Definition lift1 {A S T} (f: S -> T): (A -> S) -> (A -> T) := fun x => (f x). *)
+(* Injective & Surjective *)
+Definition injective {U V} (f: U -> V): Prop :=
+  forall x x': U, f x = f x' -> x = x'.
+
+Definition surjective {U V} (f: U -> V): Prop :=
+  forall y: V, exists x: U, y = f x.
+
+Definition bijective {U V} (f: U -> V): Prop :=
+  injective f /\ surjective f.
+
+
+Lemma bi_unique_inv: forall U V (f: U -> V) (y: V),
+  bijective f -> exists ! x, y = f x.
+Proof. intros * [I S].
+  specialize (S y) as [x ->]. exists x. split; auto. Qed.
 
 
 (* Below may not be used *)

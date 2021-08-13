@@ -212,11 +212,11 @@ Proof. firstorder. Qed.
 
 Lemma intersect_compl: forall A B: ESet U, ~! (A //\\ B) == (~! A) \\// (~! B).
 Proof. split; firstorder.
-  destruct (set_decide A x); firstorder. Qed.
+  decides (x :in: A); firstorder. Qed.
 
 Lemma compl_compl: forall A: ESet U, ~! (~! A) == A.
 Proof. split; firstorder.
-  destruct (set_decide A x); firstorder. Qed.
+  decides (x :in: A); firstorder. Qed.
 
 (* Setminus properties *)
 
@@ -532,6 +532,15 @@ Proof. intros * ?. firstorder. rewrite H1. auto. Qed.
 Lemma invim_identity: forall U (A: ESet U), InvIm id A == A.
 Proof. firstorder. Qed.
 
+Lemma im_compose: forall U V W `(DV: UsualEqDec V) `(DW: UsualEqDec W),
+  forall (A: ESet U) (f: U -> V) (g: V -> W),
+  Im (compose g f) A == Im g (Im f A).
+Proof. intros * ?. firstorder. rewrite H0, H1. firstorder. Qed.
+
+Lemma invim_compose: forall U V W (C: ESet W) (f: U -> V) (g: V -> W),
+  InvIm (compose g f) C == InvIm f (InvIm g C).
+Proof. firstorder. Qed.
+
 
 (* Indexed, synonym for image, and its alternative notation *)
 Definition Indexed {U V} `{DecSetoid V} (P: ESet U) (f: U -> V) :=
@@ -543,7 +552,7 @@ Notation "'{''  E '|' x 'in' P  ''}'" :=
 
 
 #[export]
-Hint Unfold Indexed: sets.
+Hint Transparent Indexed: sets.
 #[export]
 Hint Resolve im_def
   im_empty im_intersect im_union im_inc
@@ -715,10 +724,8 @@ Lemma intersectover_compl:
 Proof. split; [| firstorder].
   intros H. rewrite compl_iff, intersectover_iff in H.
   rewrite unionover_iff.
-  edestruct decide as [C | C]; eauto; [exact _|].
-  exfalso. apply H. intros i Hi.
-  edestruct decide; eauto; [exact _|].
-  firstorder.
+  contra. apply H. intros i Hi.
+  contra. firstorder.
 Qed.
 
 End OverOne.
@@ -756,6 +763,13 @@ Lemma intersects_exch: forall U I J (A: ESet I) (B: ESet J)
 Proof. split; apply intersects_exch_. Qed.
 
 
+Lemma intersect_distr_unions: forall U I (A: ESet U) (K: ESet I) (P: I -> ESet U),
+  A //\\ (unions i in K, P i) == (unions i in K, (A //\\ P i)).
+Proof. intros * x.
+  rewrite intersect_iff. rewrite 2 unionover_iff. firstorder. Qed.
+
+
+
 (* #[export]
 Hint Unfold UnionOver IntersectOver: sets. *)
 #[export]
@@ -789,7 +803,7 @@ Proof. intros. apply subs_eq_iff. exact _. Qed.
 
 
 Section Subset.
-Context {U:Type} `{UsualEqDec U} {A: ESet U}.
+Context {U:Type} `(UsualEqDec U) {A: ESet U}.
 
 Lemma incl_im_of_invim: forall B, Im (@inclu _ A) (InvIm inclu B) == A //\\ B.
 Proof.

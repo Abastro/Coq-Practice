@@ -12,6 +12,10 @@ Tactic Notation "decides" constr(x) :=
 Tactic Notation "decides" constr(x) "as" simple_intropattern(y) :=
   destruct (decide x) as y.
 
+Ltac contra := match goal with
+  | [ |- ?R ] => let c := fresh "contra" in decides R as [|c]; [easy | exfalso]
+  end.
+
 Instance decT: Dec True.
 Proof. apply dec_True. Qed.
 
@@ -70,6 +74,9 @@ Class UsualEqDec U := {
   usual_setoid :> UsualSetoid U
 ; usual_dec :> DecSetoid (setoid_usual U _)
 }.
+
+Instance decp2_usualeq {U} `{UsualEqDec U}: DecP2 (@eq U).
+Proof. intros x y. decides (x == y); firstorder. Qed.
 
 
 (* Notation to consider implication as an operator *)
