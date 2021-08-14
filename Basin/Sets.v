@@ -542,6 +542,21 @@ Lemma invim_compose: forall U V W (C: ESet W) (f: U -> V) (g: V -> W),
 Proof. firstorder. Qed.
 
 
+Lemma invim_of_im_eq_inj: forall U V `(D: UsualEqDec V) (f: U -> V) (A: ESet U),
+  injective f -> InvIm f (Im f A) == A.
+Proof. intros ** x. rewrite invim_iff. split.
+  - intros (x' & ? & ->%H). trivial.
+  - intros. apply im_def. trivial.
+Qed.
+
+Lemma im_of_invim_eq_surj: forall U V `(D: UsualEqDec V) (f: U -> V) (B: ESet V),
+  surjective f -> Im f (InvIm f B) == B.
+Proof. intros ** y. split.
+  - intros (x & ? & ->). trivial.
+  - intros. destruct (H y) as [x ->]. firstorder.
+Qed.
+
+
 (* Indexed, synonym for image, and its alternative notation *)
 Definition Indexed {U V} `{DecSetoid V} (P: ESet U) (f: U -> V) :=
   Im f P.
@@ -866,8 +881,9 @@ Add Parametric Morphism U V: (@Product U V)
   with signature equiv ==> equiv ==> equiv as prod_mor.
 Proof. intros ** []. firstorder. Qed.
 
+
 Section AProd.
-Context {U:Type} {V:Type}.
+Context {U V:Type}.
 
 Lemma empty_l_prod: forall B, EmptySet ** B == @EmptySet (U * V).
 Proof. intros ? []. firstorder. Qed.

@@ -54,22 +54,23 @@ Add Parametric Morphism U V `(Setoid V): (fun (f: U -> V) (x: U) => f x)
   with signature equiv ==> eq ==> equiv as apply_mor.
 Proof. auto. Qed.
 
-Program Instance setoid_sub U (P: U -> Prop) `(Setoid U): Setoid (sig P) := {
+(* Program Instance setoid_sub U (P: U -> Prop) `(Setoid U): Setoid (sig P) := {
   equiv := fun x y => proj1_sig x == proj1_sig y
 }.
-Next Obligation. split; red; eauto. Qed.
+Next Obligation. split; red; eauto. Qed. *)
 
 (* Shorthand for sig types *)
 Definition get {U:Type} {P: U -> Prop} (pf: sig P): U
   := proj1_sig pf.
 Definition getPr {U:Type} {P: U -> Prop} (pf: sig P): P (get pf)
   := proj2_sig pf.
-Add Parametric Morphism U (P: U -> Prop) `(Setoid U): (@get U P)
+
+(* Add Parametric Morphism U (P: U -> Prop) `(Setoid U): (@get U P)
   with signature equiv ==> equiv as get_mor.
-Proof. auto. Qed.
+Proof. auto. Qed. *)
 
 #[export]
-Hint Unfold setoid_usual setoid_function setoid_sub: core.
+Hint Unfold setoid_usual setoid_function: core.
 #[export]
 Hint Resolve usualeq_spec: core.
 
@@ -89,6 +90,14 @@ Lemma bi_unique_inv: forall U V (f: U -> V) (y: V),
   bijective f -> exists ! x, y = f x.
 Proof. intros * [I S].
   specialize (S y) as [x ->]. exists x. split; auto. Qed.
+
+Lemma left_inv_then_inj: forall U V (f: U -> V) (g: V -> U),
+  (forall x, g (f x) = x) -> injective f.
+Proof. intros ** x x' E. rewrite <- (H x), <- (H x'). f_equal. trivial. Qed.
+
+Lemma right_inv_then_surj: forall U V (f: U -> V) (g: V -> U),
+  (forall y, f (g y) = y) -> surjective f.
+Proof. intros ** y. exists (g y). easy. Qed.
 
 
 (* Below may not be used *)

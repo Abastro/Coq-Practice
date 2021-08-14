@@ -304,13 +304,109 @@ End Base.
 
 
 (* ----------------------------------------------------------------- *)
+(*                     Continuity & Homeomorphism                    *)
+(* ----------------------------------------------------------------- *)
+
+Definition Continuous {X Y} (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
+  ForallIn (opens(T)) (fun V => open(S) (InvIm f V)).
+
+Notation "f ':-' S '~>' T" := (Continuous S T f)
+  (at level 75, no associativity).
+
+Add Parametric Morphism X Y: (@Continuous X Y)
+  with signature equiv ==> equiv ==> eq ==> iff as conti_mor.
+Proof. firstorder. Qed.
+
+
+Property conti_as_set: forall X Y (S: Topology X) (T: Topology Y) (f: X -> Y),
+  (f :- S ~> T) <-> ({' InvIm f V | V in opens(T) '} <:= opens(S)).
+Proof. intros. split.
+  - intros H _ (V & ? & ->). apply H. trivial.
+  - intros H V HV. apply H. apply im_def. trivial.
+Qed.
+
+
+Lemma basis_invim_conti: forall X Y (S: Topology X) (B: Basis Y) (f: X -> Y),
+  ForallIn (opens(B)) (fun V => open(S) (InvIm f V)) ->
+  f :- S ~> topoByBase B.
+Proof.
+  intros ** V (F & HV1 & ->)%open_iff_base_unions.
+  rewrite unions_as_over, invim_unionover.
+  apply unionover_is_open. firstorder.
+Qed.
+
+Lemma subbasis_invim_conti: forall X Y (S: Topology X) (B: Subbasis Y) (f: X -> Y),
+  ForallIn (opens(B)) (fun V => open(S) (InvIm f V)) ->
+  f :- S ~> topoByBase (baseBySubbase B).
+Proof.
+  intros **. apply basis_invim_conti.
+  intros _ (L & HL & ->). induction L.
+  - simpl. rewrite invim_full. apply full_is_open.
+  - simpl. rewrite invim_intersect.
+    inversion HL; subst.
+    apply intersect_is_open; firstorder.
+Qed.
+
+
+Section ConstrConti.
+Context {X Y Z: Type} (R: Topology X) (S: Topology Y) (T: Topology Z).
+
+Lemma const_conti: forall (y: Y), (const y) :- R ~> S.
+Proof. intros ** U HU. decides (y :in: U) as [H|H].
+  - eapply proper_opens; [| apply full_is_open]. firstorder.
+  - eapply proper_opens; [| apply empty_is_open]. firstorder.
+Qed.
+
+Lemma id_conti: id :- R ~> R.
+Proof. intros U. rewrite invim_identity. easy. Qed.
+
+Lemma compose_conti: forall f g,
+  (f :- R ~> S) -> (g :- S ~> T) -> compose g f :- R ~> T.
+Proof. intros * Hf Hg U HU.
+  rewrite invim_compose. apply Hf, Hg, HU. Qed.
+
+End ConstrConti.
+
+
+Section UsualMap.
+Context {X Y: Type} `{D: UsualEqDec Y}.
+
+Definition OpenMap (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
+  ForallIn (opens(S)) (fun U => open(T) (Im f U)).
+
+Definition Homeomorphism (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
+  bijective f /\ Continuous S T f /\ OpenMap S T f.
+
+End UsualMap.
+
+Notation "f ':-' S '~=' T" := (Homeomorphism S T f)
+  (at level 75, no associativity).
+
+Lemma homeo_bijective: forall X Y `(DX: UsualEqDec X) `(DY: UsualEqDec Y),
+  forall (S: Topology X) (T: Topology Y) f g,
+  compose f g == id -> compose g f == id -> 
+  f :- S ~> T -> g :- T ~> S -> f :- S ~= T.
+Proof with auto.
+  intros * E1 E2 Hf Hg.
+  assert (Bij: bijective f). { split.
+    eapply left_inv_then_inj. apply E2.
+    eapply right_inv_then_surj. apply E1.
+  }
+  split... split... (* Only open map is nontrivial *)
+  intros U HU.
+  setoid_replace (Im f U) with (InvIm g U). apply Hg...
+  rewrite <- invim_identity, <- E1, invim_compose.
+  eapply invim_mor... apply invim_of_im_eq_inj, Bij.
+Qed.
+
+
+(* ----------------------------------------------------------------- *)
 (*                       Subspace Topology                           *)
 (* ----------------------------------------------------------------- *)
 
 (* Subspace topology *)
 Section Subspace.
-Context {X:Type}.
-Context (T: Topology X) (A: ESet X).
+Context {X:Type} (T: Topology X) (A: ESet X).
 
 Definition subsetOver (C: Powerset X): Powerset (Subset A) :=
   {' InvIm inclu U | U in C '}.
@@ -343,58 +439,98 @@ Next Obligation. apply subspace_topo. Qed.
 
 Lemma subsp_basis_from_basis: forall C: Powerset X,
   isBaseOf C T -> isBaseOf (subsetOver C) SubspaceT.
-Proof.
+Proof with (auto with sets).
   intros ? [B (<- & HE)]. do 2 red in HE. apply identify_base.
   - (* Proper *) exact _.
   - (* Contained in subspace topology *)
-    unfold opens, SubspaceT, subsetOver.
     apply im_inc. rewrite <- HE. apply base_is_open.
   - (* Forms basis of the topo *)
     intros V [U (HU%HE & EV)] y Hy%EV.
     specialize (HU (inclu y) Hy) as [W (? & ? & ?)].
-    exists (InvIm inclu W). firstorder.
+    exists (InvIm inclu W). rewrite EV.
+    split. apply im_def... split...
 Qed.
 
+(* Using usual equality *)
 Section UsualEq.
 Context `{UsualEqDec X}.
 
 Lemma open_subsp_open_whole: forall U: ESet (Subset A),
   open(T) A -> open(SubspaceT) U -> open(T) (Im inclu U).
-Proof with (eauto with sets).
-  intros * ? [V [? E]]%im_iff.
-  setoid_replace (Im inclu U) with (A //\\ V).
-  apply intersect_is_open... rewrite E...
+Proof with (auto with sets).
+  intros * ? [V [? ->]]%im_iff.
+  rewrite incl_im_of_invim. apply intersect_is_open...
 Qed.
 
-Lemma closed_subsp_iff: forall E: ESet (Subset A),
-  ExistsIn (closes(T)) (fun F => InvIm inclu F == E) <-> closed(SubspaceT) E.
-Proof with (eauto with sets). intros *. split.
+Lemma closes_subsp_is: closes(SubspaceT) == {' InvIm inclu E | E in closes(T) '}.
+Proof with (auto with sets).
+  intros E. split.
   - (* -> *)
-    intros [F [HC HE]]. do 4 red in HC.
-    do 5 red. firstorder.
-  - (* <- *)
-    intros [U [HO HE]]. exists (~! U). split.
-    do 4 red. rewrite compl_compl...
+    intros [U [H0 HE]]. exists (~! U).
+    split. do 4 red. rewrite compl_compl...
     rewrite <- invim_compl, <- HE...
+  - (* <- *)
+    intros [F [HC HE]]. do 4 red in HC |- *.
+    rewrite HE, invim_compl. apply im_def...
 Qed.
-Corollary closed_subsp_def: forall F: ESet X,
-  closed(T) F -> closed(SubspaceT) (InvIm inclu F).
-Proof. intros **. apply closed_subsp_iff.
-  exists F. split; auto with sets. Qed.
+Corollary closed_subsp_iff: forall (F: ESet (Subset A)),
+  closed(SubspaceT) F <-> ExistsIn (closes(T)) (fun E => F == InvIm inclu E).
+Proof. intros. unfold closed. rewrite closes_subsp_is. firstorder. Qed.
 
 Lemma closed_subsp_closed_whole: forall (E: ESet (Subset A)),
   closed(T) A -> closed(SubspaceT) E -> closed(T) (Im inclu E).
 Proof with (eauto with sets).
-  intros * HA [V []]%invim_iff. unfold closed.
-  assert (E == InvIm inclu (~! V)) as ->.
-    rewrite <- invim_compl, <- H1...
+  intros * ?. unfold closed. rewrite closes_subsp_is.
+  intros [F [? ->]]%im_iff.
   rewrite incl_im_of_invim. apply intersect_is_closed...
-  eapply proper_opens...
 Qed.
 
 End UsualEq.
 
+(* Subspace and continuity *)
+
+Lemma inclu_conti: inclu :- SubspaceT ~> T.
+Proof. intros U HU. apply im_def. auto. Qed.
+
 End Subspace.
+
+
+(* Use local-continuity to prove continuity *)
+Lemma localconti_conti: forall X Y (R: Topology X) (S: Topology Y),
+  forall `(UsualEqDec X) f (P: Powerset X),
+  P <:= opens(R) -> cover_all P ->
+  ForallIn P (fun U => compose f inclu :- (SubspaceT R U) ~> S) ->
+  f :- R ~> S.
+Proof with (auto with sets).
+  intros * ? * HO HC Hf V HV. set (fU U := compose f (@inclu _ U)).
+  assert (E: forall U, InvIm f V //\\ U == Im inclu (InvIm (fU U) V)). {
+    intros U. unfold fU.
+    rewrite invim_compose, incl_im_of_invim...
+  }
+  assert (Claim: InvIm f V == unions U in P, Im inclu (InvIm (fU U) V)). {
+    setoid_replace (InvIm f V) with (InvIm f V //\\ unions U in P, U).
+    rewrite intersect_distr_unions. apply unionover_mor...
+    firstorder.
+  }
+  rewrite Claim. apply unionover_is_open. intros U HU.
+  apply open_subsp_open_whole. apply HO... apply Hf...
+Qed.
+
+
+(* Imbedding *)
+Section UsualMap.
+Context {X Y: Type} `{D: UsualEqDec Y}.
+
+Program Definition imbed (f: X -> Y): X -> Subset (Im f FullSet) :=
+  fun x => exist _ (f x) _.
+Next Obligation. exists x. firstorder. Qed.
+
+Definition Imbedding (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
+  let SubT := SubspaceT(T) (Im f FullSet) in
+  imbed f :- S ~= SubT.
+
+End UsualMap.
+
 
 (* ----------------------------------------------------------------- *)
 (*                        Product Topology                           *)
@@ -407,21 +543,26 @@ Context (S: Topology X) (T: Topology Y).
 Definition prodOver (C: Powerset X) (D: Powerset Y): Powerset (X * Y) :=
   {' U ** V | '(U, V) in C ** D '}.
 
+Property prodover_def: forall C D U V,
+  U :in: C -> V :in: D -> (U ** V) :in: prodOver C D.
+Proof. intros. exists (U, V). firstorder. Qed.
+
+
 Proposition prod_basis: isBase (prodOver (opens S) (opens T)).
-Proof with (eauto 4 with sets).
-  split; unfold prodOver.
+Proof with (eauto 3 with sets).
+  split.
   - (* Covers *)
     exists {| FullSet |}. split.
-    + intros _ <-%singleton_iff.
-      eexists (_, _). split... split; apply full_is_open.
+    + intros _ <-%singleton_iff. rewrite <- full_prod.
+      apply prodover_def; apply full_is_open.
     + red...
   - (* Intersection *)
     intros W1 W2 x [(U1, V1) [H1 E1]] [(U2, V2) [H2 E2]] H.
-    exists (W1 //\\ W2). split...
-    apply prod_iff in H1 as (HU1 & HV1). apply prod_iff in H2 as (HU2 & HV2).
+    exists (W1 //\\ W2). split; [| split]...
+    destruct H1 as (HU1 & HV1), H2 as (HU2 & HV2).
     specialize (intersect_is_open _ _ _ HU1 HU2) as H1.
     specialize (intersect_is_open _ _ _ HV1 HV2) as H2.
-    eexists. split. apply prod_iff. split... all_rewrite...
+    eexists (_, _). split... rewrite E1, E2...
 Qed.
 
 Program Definition ProductB: Basis (X * Y) := mkTopo (prodOver (opens S) (opens T)) _ _.
@@ -433,22 +574,36 @@ Definition ProductT: Topology (X * Y) := topoByBase ProductB.
 Lemma prod_basis_from_basis: forall (B: Powerset X) (C: Powerset Y),
   isBaseOf B S -> isBaseOf C T ->
   isBaseOf (prodOver B C) ProductT.
-Proof with (eauto with sets).
+Proof with (auto with sets).
   intros * [Bt (<- & EB)] [Ct (<- & EC)].
   apply identify_base.
   - exact _.
   - (* Contained in ProductT *)
     etransitivity; [| apply base_is_open].
-    intros P [(U, V) (? & ?)]. exists (U, V).
-    firstorder.
+    intros _ [(U, V) ([] & ->)].
+    apply prodover_def; firstorder.
   - (* Forms basis of the topo *)
     intros W HW (x, y) Hxy.
-    specialize (HW (x, y) Hxy) as [P [[(U, V) (HI & HE)] (HR1 & HR2)]].
-    rewrite HE in *.
-    destruct HI as (HU%EB & HV%EC). destruct HR1 as (HU2 & HV2).
+    specialize (HW (x, y) Hxy) as [_ [[(U, V) (HI & ->)] (HR1 & HR2)]].
+    destruct HI as (HU%EB & HV%EC), HR1 as (HU2 & HV2).
     specialize (HU x HU2) as [I (?&?&?)]. specialize (HV y HV2) as [J (?&?&?)].
-    exists (I ** J). split. eexists (_, _)...
+    exists (I ** J). split. apply prodover_def...
     split... etransitivity; eauto...
+Qed.
+
+
+Lemma fst_conti: fst :- ProductT ~> S.
+Proof with (auto with sets).
+  intros * V HV. rewrite invim_fst_prod.
+  apply base_is_open, prodover_def...
+  apply full_is_open.
+Qed.
+
+Lemma snd_conti: snd :- ProductT ~> T.
+Proof with (auto with sets).
+  intros * V HV. rewrite invim_snd_prod.
+  apply base_is_open, prodover_def...
+  apply full_is_open.
 Qed.
 
 
@@ -466,26 +621,80 @@ Proof with (eauto with sets).
   - (* Generates exact *)
     exists B. split; auto. apply same_inc_iff. split.
     + (* open ProductT =:> *)
-      apply subbasis_gen_minimal.
-      etransitivity; [| apply base_is_open]. rewrite HS.
-      apply union_inc_split. split.
-      all: intros _ (? & ? & ->); eexists (_, _); split...
-      all: split... all: apply full_is_open.
+      apply subbasis_gen_minimal. rewrite HS.
+      apply union_inc_split.
+      split; apply conti_as_set. apply fst_conti. apply snd_conti.
     + (* open ProductT <:= *)
       apply basis_gen_minimal. etransitivity; [| apply base_is_open].
-      intros P [(U, V) ((HU & HV) & HP)]. apply im_iff.
+      intros _ [(U, V) ((HU & HV) & ->)]. apply im_iff.
       exists [InvIm fst U; InvIm snd V]. rewrite HS. split.
       * repeat apply Forall_cons; [left | right | constructor]...
-      * rewrite IntersectList_couple. etransitivity...
+      * rewrite IntersectList_couple...
+Qed.
+
+
+(* Checking continuous function into product space *)
+Theorem product_map_conti: forall W (R: Topology W),
+  forall f1 f2, let f := fun a => (f1 a, f2 a) in
+  (f :- R ~> ProductT) <-> (f1 :- R ~> S) /\ (f2 :- R ~> T).
+Proof with (auto with sets).
+  intros. split.
+  - (* -> *)
+    intros H. split;
+    [ replace f1 with (compose fst f) | replace f2 with (compose snd f) ]...
+    all: eapply compose_conti; [apply H|].
+    apply fst_conti. apply snd_conti.
+  - (* <- *)
+    intros (H1 & H2). apply basis_invim_conti.
+    intros _ ((U, V) & [HU HV] & ->).
+    assert (InvIm f (U ** V) == InvIm f1 U //\\ InvIm f2 V) as ->. {
+      intros x. rewrite intersect_iff. rewrite 3 invim_iff. apply prod_iff. }
+    apply intersect_is_open. apply H1... apply H2...
 Qed.
 
 End Product.
 
-(* The theorem below requires mapping topology over bijective map
-Theorem prod_subsp_exch: forall X Y (S: Topology X) (T: Topology Y),
-  forall (A: ESet X) (B: ESet Y),
-  open (ProductT (SubspaceT S A) (SubspaceT T B)) '= open (SubspaceT (ProductT S T) (A ** B)).
-*)
+
+(* Homeomorphism btwn product of subspaces and subspace of products *)
+(* TODO Rewrite *)
+Theorem prod_subsp_exch: forall X Y `(DX: UsualEqDec X) `(DY: UsualEqDec Y),
+  forall (S: Topology X) (T: Topology Y) (A: ESet X) (B: ESet Y),
+  let SubA := SubspaceT(S) A in let SubB := SubspaceT(T) (B) in
+  ps_to_sp :- ProductT SubA SubB ~= SubspaceT (ProductT S T) (A ** B).
+Proof with auto.
+  intros.
+  (* Convert subspace of product space to use basis *)
+  assert ( isBaseOf ( subsetOver (A ** B) ( prodOver (opens S) (opens T) ) )
+      (SubspaceT (ProductT S T) (A ** B))
+  ) as (BSP & HE & Rep).
+  { apply subsp_basis_from_basis; exists (ProductB S T)... }
+
+  (* TODO Set equal under bijection *)
+  (* Basis elements are equal *)
+  assert ( EQ: forall U V,
+    InvIm ps_to_sp (InvIm (@inclu _ (A ** B)) (U ** V)) ==
+    InvIm inclu U ** InvIm inclu V ).
+  { intros * (x, y). rewrite prod_iff, 4 invim_iff. reflexivity. }
+
+  assert (E1: compose ps_to_sp (@sp_to_ps _ _ A B) == id).
+  { intros ?. apply sub_prod_id. }
+  assert (E2: compose sp_to_ps (@ps_to_sp _ _ A B) == id).
+  { intros ?. apply prod_sub_id. }
+
+  eapply homeo_bijective with (g := sp_to_ps)...
+  - (* ps_to_sp continuous *)
+    rewrite <- Rep. apply basis_invim_conti. rewrite HE.
+    intros _ (_ & ((U, V) & [HU HV] & ->) & ->).
+    apply base_is_open.
+    rewrite -> EQ.
+    apply prodover_def... all: apply im_def...
+  - (* sp_to_ps continuous *)
+    rewrite <- Rep. apply basis_invim_conti.
+    intros _ ((_, _) & [(U & HU & ->) (V & Hv & ->)] & ->).
+    apply base_is_open. rewrite HE.
+    rewrite <- EQ, <- invim_compose, E1, invim_identity.
+    apply im_def. apply prodover_def...
+Qed.
 
 
 (* ----------------------------------------------------------------- *)
@@ -530,7 +739,7 @@ End TopoStr.
 Notation "'Int' [ T ]" := (Interior T).
 Notation "'Cl' [ T ]" := (Closure T).
 
-Lemma subspace_closure: forall X `(UsualEqDec X) T (Y: ESet X) (A: ESet (Subset Y)),
+Lemma subspace_closure: forall X `(D: UsualEqDec X) T (Y: ESet X) (A: ESet (Subset Y)),
   let S := SubspaceT T Y in
   Cl[S] A == InvIm inclu (Cl[T] (Im inclu A)).
 Proof with (auto with sets).
@@ -538,16 +747,16 @@ Proof with (auto with sets).
   - (* Cl[S] A <:= Cl A /\ Y *)
     set (E := Cl[T] (Im inclu A)).
     apply intersects_inced_one. split.
-    apply closed_subsp_def with (F := E)... apply closure_closed.
+    apply closes_subsp_is, im_def, closure_closed.
     do 3 red. rewrite <- (incl_invim_of_im _ A).
     apply invim_inc, closure_out.
   - (* Cl[S] A =:> Cl A /\ Y *)
     set (B := Cl[S] A).
-    assert (closed(S) B) as [C (? & HE)]%closed_subsp_iff by apply closure_closed...
-    rewrite <- HE. apply invim_inc, intersects_inced_one.
+    assert (closed(S) B) as (C & HC & HE)%closed_subsp_iff by apply closure_closed...
+    rewrite HE. apply invim_inc, intersects_inced_one.
     split... do 3 red. transitivity (Y //\\ C)...
     rewrite <- incl_im_of_invim. apply im_inc.
-    rewrite HE. apply closure_out.
+    rewrite <- HE. apply closure_out.
 Qed.
 
 
@@ -697,38 +906,9 @@ Proof with (auto with sets).
 Qed.
 
 
-(* ----------------------------------------------------------------- *)
-(*                       Continuous Functions                        *)
-(* ----------------------------------------------------------------- *)
-
-Definition Continuous {X Y} (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
-  ForallIn (opens(T)) (fun V => open(S) (InvIm f V)).
-
-Notation "f ':-' S '~>' T" := (Continuous S T f)
-  (at level 75, no associativity).
-
-Lemma basis_invim_conti: forall X Y (S: Topology X) (B: Basis Y) (f: X -> Y),
-  ForallIn (opens(B)) (fun V => open(S) (InvIm f V)) ->
-  f :- S ~> topoByBase B.
-Proof.
-  intros ** V (F & HV1 & ->)%open_iff_base_unions.
-  rewrite unions_as_over, invim_unionover.
-  apply unionover_is_open. firstorder.
-Qed.
-
-Lemma subbasis_invim_conti: forall X Y (S: Topology X) (B: Subbasis Y) (f: X -> Y),
-  ForallIn (opens(B)) (fun V => open(S) (InvIm f V)) ->
-  f :- S ~> topoByBase (baseBySubbase B).
-Proof.
-  intros **. apply basis_invim_conti.
-  intros _ (L & HL & ->). induction L.
-  - simpl. rewrite invim_full. apply full_is_open.
-  - simpl. rewrite invim_intersect.
-    inversion HL; subst.
-    apply intersect_is_open; firstorder.
-Qed.
 
 
+(* TODO Move *)
 (* TFAE used *)
 Import TFAE.
 
@@ -781,116 +961,6 @@ Qed.
 End MapToEq.
 
 
-Section ConstrConti.
-Context {X Y Z: Type} (R: Topology X) (S: Topology Y) (T: Topology Z).
-
-Lemma const_conti: forall (y: Y), (const y) :- R ~> S.
-Proof. intros ** U HU. decides (y :in: U) as [H|H].
-  - eapply proper_opens; [| apply full_is_open]. firstorder.
-  - eapply proper_opens; [| apply empty_is_open]. firstorder.
-Qed.
-
-Lemma inclusion_conti: forall (A: ESet X), inclu :- (SubspaceT R A) ~> R.
-Proof. intros ** U HU. apply im_def. trivial. Qed.
-
-
-Lemma compose_conti: forall f g,
-  (f :- R ~> S) -> (g :- S ~> T) -> compose g f :- R ~> T.
-Proof. intros * Hf Hg U HU.
-  rewrite invim_compose. apply Hf, Hg, HU. Qed.
-
-(* Skip restriction / expansion of range *)
-
-Lemma localconti_conti: forall `(UsualEqDec X) f (P: Powerset X),
-  P <:= opens(R) -> cover_all P ->
-  ForallIn P (fun U => compose f inclu :- (SubspaceT R U) ~> S) ->
-  f :- R ~> S.
-Proof with (auto with sets).
-  intros ? * HO HC Hf V HV. set (fU U := compose f (@inclu _ U)).
-  assert (E: forall U, InvIm f V //\\ U == Im inclu (InvIm (fU U) V)). {
-    intros U. unfold fU.
-    rewrite invim_compose, incl_im_of_invim...
-  }
-  assert (Claim: InvIm f V == unions U in P, Im inclu (InvIm (fU U) V)). {
-    setoid_replace (InvIm f V) with (InvIm f V //\\ unions U in P, U).
-    rewrite intersect_distr_unions. apply unionover_mor...
-    symmetry. apply inc_intersect_eq.
-    rewrite <- unions_as_over. firstorder.
-  }
-  rewrite Claim. apply unionover_is_open. intros U HU.
-  apply open_subsp_open_whole. apply HO... apply Hf...
-Qed.
-
-End ConstrConti.
-
-Lemma fst_conti: forall X Y (R: Topology X) (S: Topology Y),
-  fst :- ProductT R S ~> R.
-Proof with (auto with sets).
-  intros * V HV. unfold open.
-  rewrite <- isSubbase_then_generate; [|apply prod_subbasis_spec].
-  apply subbase_is_open. left. unfold Indexed...
-Qed.
-
-Lemma snd_conti: forall X Y (R: Topology X) (S: Topology Y),
-  snd :- ProductT R S ~> S.
-Proof with (auto with sets).
-  intros * V HV. unfold open.
-  rewrite <- isSubbase_then_generate; [|apply prod_subbasis_spec].
-  apply subbase_is_open. right. unfold Indexed...
-Qed.
-
-
-Theorem product_map_conti: forall Z X Y (T: Topology Z) (R: Topology X) (S: Topology Y),
-  forall f1 f2, let f := fun a => (f1 a, f2 a) in
-  (f :- T ~> ProductT R S) <-> (f1 :- T ~> R) /\ (f2 :- T ~> S).
-Proof with (auto with sets).
-  intros. split.
-  - (* -> *)
-    intros H. split.
-    + replace f1 with (compose fst f)...
-      eapply compose_conti. apply H. apply fst_conti.
-    + replace f2 with (compose snd f)...
-      eapply compose_conti. apply H. apply snd_conti.
-  - (* <- *)
-    intros (H1 & H2). apply basis_invim_conti.
-    intros _ ((U, V) & [HU HV] & ->).
-    assert (InvIm f (U ** V) == InvIm f1 U //\\ InvIm f2 V) as ->. {
-      intros x. rewrite intersect_iff. rewrite 3 invim_iff. apply prod_iff.
-    }
-    apply intersect_is_open. apply H1... apply H2...
-Qed.
-
-
-(* ----------------------------------------------------------------- *)
-(*                           Homeomorphism                           *)
-(* ----------------------------------------------------------------- *)
-
-Section UsualMap.
-Context {X Y: Type} `{D: UsualEqDec Y}.
-
-Definition OpenMap (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
-  ForallIn (opens(S)) (fun U => open(T) (Im f U)).
-
-Definition Homeomorphism (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
-  bijective f /\ Continuous S T f /\ OpenMap S T f.
-
-End UsualMap.
-
-Notation "f ':-' S '~=' T" := (Homeomorphism S T f)
-  (at level 75, no associativity).
-
-Section UsualMap.
-Context {X Y: Type} `{D: UsualEqDec Y}.
-
-Program Definition imbed (f: X -> Y): X -> Subset (Im f FullSet) :=
-  fun x => exist _ (f x) _.
-Next Obligation. exists x. firstorder. Qed.
-
-Definition Imbedding (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
-  let SubT := SubspaceT(T) (Im f FullSet) in
-  imbed f :- S ~> SubT.
-
-End UsualMap.
 
 
 Definition Foo := 0.
