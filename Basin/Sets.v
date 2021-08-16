@@ -15,7 +15,6 @@ Ltac contra := match goal with
 
 Generalizable All Variables.
 
-
 (* ----------------------------------------------------------------- *)
 (*                            Set definition                         *)
 (* ----------------------------------------------------------------- *)
@@ -34,10 +33,10 @@ Context {U:Type}.
 
 (* Definition InSet (A: ESet U) (x: U): Prop := predOf A x. *)
 
-(* Property mkSet_In: forall P (pf: DecPred1 P), InSet (mkSetWith P pf) = P.
+Property mkSet_In: forall (P: U -> Prop), InSet (mkSet P) = P.
 Proof. reflexivity. Qed.
 
-Property unwrap_mkin: forall P (pf: DecPred1 P) x, InSet (mkSetWith P pf) x -> P x.
+(* Property unwrap_mkin: forall P (pf: DecPred1 P) x, InSet (mkSetWith P pf) x -> P x.
 Proof. trivial. Qed.
 
 Property set_decide: forall (A: ESet U) x, decidable (InSet A x).
