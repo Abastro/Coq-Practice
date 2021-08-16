@@ -6,10 +6,9 @@
 (* ----------------------------------------------------------------- *)
 
 From Practice Require Import Basin.Base.
-(* From Practice Require Import Basin.DecClass. *)
-From Practice Require Import Basin.Sets.
-From Practice Require Import Basin.SetLists.
-Require Import List.
+From Practice Require Import Basin.ClassicalSets.
+From Practice Require Import Basin.ClSetLists.
+Import List.
 Import ListNotations.
 
 (* Topology-like structure over type X *)
@@ -792,6 +791,57 @@ Corollary closure_nbhd: forall X T (A: ESet X) x,
 Proof. intros. etransitivity. apply closure_intersects. firstorder. Qed.
 
 
+(* Elaboration on continuity *)
+Section MapToEq.
+Context {X Y} `{D: UsualSetoid Y} (S: Topology X) (T: Topology Y) (f: X -> Y).
+
+Theorem tfae_continuity:
+  TFAE [
+      Continuous S T f
+    ; forall A: ESet X, Im f (Cl[S] A) <:= Cl[T] (Im f A)
+    ; ForallIn (closes(T)) (fun E => closed(S) (InvIm f E))
+  ].
+Proof with (auto 4 with sets).
+  intros. tfae_chain.
+  - (* 0 -> 1 *)
+    intros H A _ (x & Hx & ->).
+    rewrite -> closure_intersects in *.
+    intros V HV1%H HV2%invim_iff.
+    specialize (Hx _ HV1 HV2) as (y & ? & ?).
+    exists (f y)...
+  - (* 1 -> 2 *)
+    intros H E HE%closure_eq_iff. apply closure_eq_iff.
+    set (A := InvIm f E).
+    apply same_inc_iff. split; [| apply closure_out].
+    assert (HI: Im f (Cl[S] A) <:= Cl[T] E).
+      etransitivity... apply closure_inc_if. unfold A...
+    rewrite HE in HI. intros x Hx.
+    apply invim_iff. apply HI...
+  - (* 2 -> 0 *)
+    intros H V HV. specialize (H (~! V)).
+    rewrite <- (compl_compl V), <- invim_compl.
+    apply H. do 4 red. rewrite compl_compl...
+Qed.
+
+Theorem conti_alt_def: (f :- S ~> T) <->
+  (forall x, ForallIn (nbhd[T] (f x)) (fun V =>
+    ExistsIn (nbhd[S] x) (fun U => Im f U <:= V) )).
+Proof with (auto with sets).
+  split.
+  - intros H x V (HV1 & HV2). exists (InvIm f V).
+    apply H in HV1. apply invim_iff in HV2. split... split...
+  - intros H V HV. apply interior_eq_iff.
+    apply same_inc_iff. split; try apply interior_in.
+    intros x Hx. unfold Interior.
+    specialize (H x V (conj HV Hx)) as (Ux & [] & ?).
+    exists Ux. split... split... rewrite mkSet_In.
+    etransitivity. apply (invim_of_im_inc _ f). apply invim_inc...
+Qed.
+
+End MapToEq.
+
+
+(* Limit and Hausdorff *)
 Section TopoStr.
 Context {X:Type} `{UsualSetoid X} (T: Topology X).
 
@@ -902,58 +952,4 @@ Proof with (auto with sets).
     + split... apply K. left. apply im_def...
     + rewrite <- invim_intersect. rewrite HE...
 Qed.
-
-
-
-
-(* TODO Move *)
-
-Section MapToEq.
-Context {X Y} `{D: UsualSetoid Y} (S: Topology X) (T: Topology Y) (f: X -> Y).
-
-Theorem tfae_continuity:
-  TFAE [
-      Continuous S T f
-    ; forall A: ESet X, Im f (Cl[S] A) <:= Cl[T] (Im f A)
-    ; ForallIn (closes(T)) (fun E => closed(S) (InvIm f E))
-  ].
-Proof with (auto 4 with sets).
-  intros. tfae_chain.
-  - (* 0 -> 1 *)
-    intros H A _ (x & Hx & ->).
-    rewrite -> closure_intersects in *.
-    intros V HV1%H HV2%invim_iff.
-    specialize (Hx _ HV1 HV2) as (y & ? & ?).
-    exists (f y)...
-  - (* 1 -> 2 *)
-    intros H E HE%closure_eq_iff. apply closure_eq_iff.
-    set (A := InvIm f E).
-    apply same_inc_iff. split; [| apply closure_out].
-    assert (HI: Im f (Cl[S] A) <:= Cl[T] E).
-      etransitivity... apply closure_inc_if. unfold A...
-    rewrite HE in HI. intros x Hx.
-    apply invim_iff. apply HI...
-  - (* 2 -> 0 *)
-    intros H V HV. specialize (H (~! V)).
-    rewrite <- (compl_compl V), <- invim_compl.
-    apply H. do 4 red. rewrite compl_compl...
-Qed.
-
-Theorem conti_alt_def: (f :- S ~> T) <->
-  (forall x, ForallIn (nbhd[T] (f x)) (fun V =>
-    ExistsIn (nbhd[S] x) (fun U => Im f U <:= V) )).
-Proof with (auto with sets).
-  split.
-  - intros H x V (HV1 & HV2). exists (InvIm f V).
-    apply H in HV1. apply invim_iff in HV2. split... split...
-  - intros H V HV. apply interior_eq_iff.
-    apply same_inc_iff. split; try apply interior_in.
-    intros x Hx. unfold Interior.
-    specialize (H x V (conj HV Hx)) as (Ux & [] & ?).
-    exists Ux. split... split... rewrite mkSet_In.
-    etransitivity. apply (invim_of_im_inc _ f). apply invim_inc...
-Qed.
-
-End MapToEq.
-
 

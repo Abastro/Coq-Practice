@@ -1,5 +1,12 @@
+(* ----------------------------------------------------------------- *)
+(*                         Classical Sets                            *)
+(*                                                                   *)
+(*  Classical sets assuming Law of excluded middle.                  *)
+(*  Despite this, Many are not affected by the axiom.                *)
+(* ----------------------------------------------------------------- *)
+
 From Practice Require Import Basin.Base.
-(* From Practice Require Import Basin.DecClass. *)
+
 
 Axiom excluded_middle: forall P: Prop, P \/ ~P.
 

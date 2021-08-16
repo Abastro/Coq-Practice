@@ -1,6 +1,5 @@
 From Practice Require Import Basin.Base.
-From Practice Require Import Basin.DecClass.
-From Practice Require Import Basin.Sets.
+From Practice Require Import Basin.ClassicalSets.
 
 Require Import List.
 Import ListNotations.
