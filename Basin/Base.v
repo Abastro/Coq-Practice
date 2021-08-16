@@ -124,6 +124,12 @@ Lemma right_inv_then_surj: forall `(f: U -> V) (g: V -> U),
 Proof. intros ** y. exists (g y). easy. Qed.
 
 
+(* Aid on unique existence *)
+Lemma unique_by_uniqueness: forall U (P: U -> Prop) u,
+  P u -> uniqueness P -> unique P u.
+Proof. firstorder. Qed.
+
+
 (*
   Not used
 Fixpoint generalize_all (l: Tlist) (x: T): arrows l T :=
