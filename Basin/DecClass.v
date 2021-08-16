@@ -2,10 +2,14 @@ Require Export Decidable.
 
 From Practice Require Import Basin.Base.
 
+
+Generalizable All Variables.
+
 Class Dec (P: Prop) :=
   dec_prop: decidable P.
 
-Definition decide (P: Prop) `{Dec P}: decidable P := dec_prop.
+Definition decide P `{Dec P}: decidable P := dec_prop.
+
 
 Tactic Notation "decides" constr(x) :=
   destruct (decide x).
@@ -24,11 +28,11 @@ Proof. apply dec_False. Qed.
 
 
 (* Decidable unary predicates *)
-Class DecP1 {U:Type} (P: U -> Prop) :=
+Class DecP1 `(P: U -> Prop) :=
   dec_p1: forall x:U, decidable (P x).
 
 (* Decidable binary predicates *)
-Class DecP2 {U V:Type} (P: U -> V -> Prop) := 
+Class DecP2 `(P: U -> V -> Prop) := 
   dec_p2: forall (x:U) (y:V), decidable (P x y).
 
 (* Decidable unary prop-operators *)
@@ -53,30 +57,46 @@ Proof. intros ? ?. apply dec_iff. Qed.
 
 
 (* Translation into Dec instance *)
-Instance deci_p1 {U} (P: U -> Prop) `{DecP1 U P} u: Dec (P u).
+Instance deci_p1 `(P: U -> Prop) `(DecP1 U P) u: Dec (P u).
 Proof. apply dec_p1. Qed.
-Instance deci_p2 {U V} (P: U -> V -> Prop) `{DecP2 U V P} u v: Dec (P u v).
+Instance deci_p2 `(P: U -> V -> Prop) `(DecP2 U V P) u v: Dec (P u v).
 Proof. apply dec_p2. Qed.
-Instance deci_op1 (F: Prop -> Prop) `{DecOp1 F} P `{Dec P}: Dec (F P).
+Instance deci_op1 (F: Prop -> Prop) `(DecOp1 F) `(Dec P): Dec (F P).
 Proof. apply dec_op1. trivial. Qed.
-Instance deci_op2 (F: Prop -> Prop -> Prop) `{DecOp2 F} P Q `{Dec P} `{Dec Q}: Dec (F P Q).
+Instance deci_op2 (F: Prop -> Prop -> Prop) `(DecOp2 F) `(Dec P) `(Dec Q): Dec (F P Q).
 Proof. apply dec_op2; trivial. Qed.
 
 
 (* Decidable Setoids *)
-Class DecSetoid {U} `(S : Setoid U) :=
+Class DecSetoid `(S: Setoid U) :=
   setoid_dec : forall x y : U, decidable (x == y).
 
-Instance decp_seq U `{DecSetoid U}: DecP2 equiv.
+Instance decp_seq `(DecSetoid U): DecP2 equiv.
 Proof. intros ? ?. apply setoid_dec. Qed.
 
 Class UsualEqDec U := {
   usual_setoid :> UsualSetoid U
-; usual_dec :> DecSetoid (setoid_usual U _)
+; usual_dec :> DecSetoid (setoid_usual _)
 }.
 
-Instance decp2_usualeq {U} `{UsualEqDec U}: DecP2 (@eq U).
+Instance decp2_usualeq `(UsualEqDec U): DecP2 (@eq U).
 Proof. intros x y. decides (x == y); firstorder. Qed.
+
+
+(* Propagating decidable equality *)
+Program Instance usual_dec_sig `(UsualEqDec U) (P: U -> Prop):
+  UsualEqDec {x | P x}.
+Next Obligation with auto.
+  intros ? ?. simpl. red. rewrite sig_eq_iff...
+  decides (get x = get y)...
+Qed.
+
+Program Instance usual_dec_prod `(UsualEqDec U) `(UsualEqDec V):
+  UsualEqDec (U * V).
+Next Obligation with auto.
+  intros (x, y) (x', y'). simpl. unfold decidable.
+  rewrite pair_equal_spec. decides (x == x' /\ y == y')...
+Qed.
 
 
 (* Notation to consider implication as an operator *)
@@ -87,52 +107,91 @@ Hint Unfold impl: core.
 
 
 (* Typeclass mechanics for decidability of 1-predicate *)
-Class DecPred1 {U:Type} (P: U -> Prop) :=
+Class DecPred1 `(P: U -> Prop) :=
   dec_pr1: forall x, decidable (P x).
 
-Instance decpr1_const {U} P `{Dec P}: @DecPred1 U (const P).
+Instance decpr1_const {U} P `(Dec P): @DecPred1 U (const P).
 Proof. intros ?. auto. Qed.
 
-Instance decpr1_p1 {U T} P `{DecP1 U P} (t: T -> U):
+Instance decpr1_p1 {U} P `(DecP1 U P) `(t: T -> U):
   DecPred1 (fun x => P (t x)).
 Proof. intros ?. auto. Qed.
 
-Instance decpr1_p2 {U V T} P `{DecP2 U V P} (s: T -> U) (t: T -> V):
+Instance decpr1_p2 {U V} P `(DecP2 U V P) `(s: T -> U) `(t: T -> V):
   DecPred1 (fun x => P (s x) (t x)).
 Proof. intros ?. auto. Qed.
 
-Instance decpr1_op1 {U} F `{DecOp1 F} (P: U -> Prop) `(DecPred1 U P):
+Instance decpr1_op1 {U} F `(DecOp1 F) `(P: U -> Prop) `(DecPred1 U P):
   DecPred1 (fun x => F (P x)).
 Proof. intros ?. auto. Qed.
 
-Instance decpr1_op2 {U} F `{DecOp2 F} (P Q: U -> Prop) `(DecPred1 U P) `(DecPred1 U Q):
+Instance decpr1_op2 {U} F `(DecOp2 F) (P Q: U -> Prop) `(DecPred1 U P) `(DecPred1 U Q):
   DecPred1 (fun x => F (P x) (Q x)).
 Proof. intros ?. auto. Qed.
 
-(* Specialize to Dec *)
-(* Instance dec_decpr {U} P (x: U) `{DecPred1 U P}: (Dec (P x)).
-Proof. apply dec_pr1. Qed. *)
 
+(* Index type where any existence could be searched *)
+Class Findable (J: Type): Prop :=
+  findEx: forall P: J -> Prop, DecP1 P -> Dec (exists a, P a).
 
-(* Marks witness-search as decidable *)
-(* Perhaps equivalent to excluded middle, but at least feels better this way *)
-Axiom DecExists: forall U (P: U -> Prop), DecPred1 P -> Dec (exists x, P x).
+Instance decp_exists `(Findable J) `(DecPred1 J P): Dec (exists a, P a).
+Proof. apply findEx. trivial. Qed.
 
-Lemma DecForall: forall U (P: U -> Prop), DecPred1 P -> Dec (forall x, P x).
-Proof. intros. apply (decpr1_op1 not) in H as H0. apply DecExists in H0 as [[x H0] | H0].
-  - right. intros ?. auto.
-  - left. intros x. destruct (H x). auto. exfalso. eauto.
+Instance decp_forall `(F: Findable J) `(D: DecPred1 J P): Dec (forall a, P a).
+Proof with eauto.
+  apply (decpr1_op1 not _) in D as K. apply F in K as [(i, K)|K].
+  - right... - left. intros i. destruct (D i)... exfalso...
 Qed.
 
-Instance decp_exists {U} P `{DecPred1 U P}: Dec (exists x, P x).
-Proof. apply DecExists. trivial. Qed.
 
-Instance decp_forall {U} P `{DecPred1 U P}: Dec (forall x, P x).
-Proof. apply DecForall. trivial. Qed.
+Instance findable_bool: Findable bool.
+Proof with eauto.
+  intros P DP.
+  decides (P false \/ P true) as [H|]. destruct H; left...
+  right. intros [[] ?]...
+Qed.
 
 
-(* Below may not be used *)
+Instance findable_sum `(Findable J) `(Findable K): Findable (J + K).
+Proof with eauto.
+  intros P DP.
+  decides (exists j, P (inl j)) as [[j Hj]|Hl]. left...
+  decides (exists k, P (inr k)) as [[k Hk]|Hr]. left...
+  right. intros [[] ?]...
+Qed.
 
+Instance findable_prod `(Findable J) `(Findable K): Findable (J * K).
+Proof with eauto.
+  intros P DP.
+  destruct (@decide (exists j k, P (j, k))) as [(? & ? & ?)|]. {
+    apply decp_exists... intros ?. apply dec_prop.
+  } left...
+  right. intros [[] ?]...
+Qed.
+
+
+
+(*
+  Problem of naive witness-search
+
+  Proposition decexists_excluded_middle:
+    (forall U (P: U -> Prop), inhabited U -> DecPred1 P -> Dec (exists x, P x)) ->
+    forall P: Prop, Dec P.
+  Proof.
+    intros DE *.
+    set (U := option P).
+    set (F := (fun p: U => match p with Some _ => True | None => False end) ).
+    assert (Dec (exists pf: U, F pf)) as [[pf H]|H]. {
+      apply DE. constructor. exact None.
+      intros []; apply dec_prop. }
+    - destruct pf as [pf|]; try contradiction. left. exact pf.
+    - right. intros pf. apply H. exists (Some pf). simpl. trivial.
+  Qed.
+*)
+
+
+(*
+  Below not used
 (* Using typeclass mechanics to infer decidability of predicate *)
 Class DecPred (l: Tlist) (P: predicate l) :=
   dec_pred: predicate_all l (pointwise_ext decidable l P).
@@ -171,165 +230,5 @@ Proof. induction l. auto. simpl. apply DecExists. intros ?. apply IHl. apply H. 
 
 Instance decp_forall_l (l: Tlist) P `{DecPred l P}: Dec (predicate_all l P).
 Proof. induction l. auto. simpl. apply DecForall. intros ?. apply IHl. apply H. Qed.
+*)
 
-
-
-(* ----------------------------------------------------------------- *)
-(*                Proof Irrelevance with minimal axioms              *)
-(* ----------------------------------------------------------------- *)
-
-(* Follows the proof outline of Coq.Logic.Berardi *)
-Section ProofIrrelevance.
-
-Let IFProp {P:Prop} (B:Prop) `{Dec B} (e1 e2: P) :=
-  match decide B with
-  | or_introl _ => e1
-  | or_intror _ => e2
-  end.
-
-(* AoC on disjunction *)
-Lemma AC_IF: forall (P B:Prop) `{Dec B} (e1 e2:P) (Q:P -> Prop),
-  (B -> Q e1) -> (~ B -> Q e2) -> Q (IFProp B e1 e2).
-Proof. intros. unfold IFProp.
-  destruct (decide B); auto. Qed.
-
-Variable Bool: Prop.
-Variable T: Bool.
-Variable F: Bool.
-Context `{Dec Bool}.
-
-Let pow (P:Prop) := P '-> Bool.
-
-Local Instance dec_pow P `{Dec P}: Dec (pow P).
-Proof. apply dec_imp; auto. Qed.
-
-(* Another axiom weaker than EM *)
-Axiom ProofDecidable: forall P: Prop, decidable P -> forall p1 p2: P, decidable (p1 = p2). 
-
-Local Instance dec_proof (P: Prop) `{Dec P}: @DecP2 P P eq.
-Proof. intros ? ?. apply ProofDecidable. trivial. Qed.
-
-Section Retracts.
-  Variables A B: Prop.
-
-  Record retract: Prop :=
-    {i: A -> B; j: B -> A; inv: forall a:A, j (i a) = a}.
-  Record retract_cond: Prop :=
-    {i2: A -> B; j2: B -> A; inv2: retract -> forall a:A, j2 (i2 a) = a}.
-
-  Lemma AC: forall r:retract_cond, retract -> forall a:A, j2 r (i2 r a) = a.
-  Proof. apply inv2. Qed.
-
-  Local Instance dec_retract `{Dec A} `{Dec B}: Dec retract.
-  Proof.
-    assert (D: Dec (exists (i: A -> B) (j: B -> A), forall a:A, j (i a) = a)). {
-      apply DecExists. intros i.
-      apply DecExists. intros j.
-      apply DecForall. exact _.
-    }
-    destruct D as [(i, (j, ?))|].
-    left. econstructor; eauto.
-    right. intros []. firstorder.
-  Qed.
-
-  Local Instance dec_retract_cond `{Dec A} `{Dec B}: Dec retract_cond.
-  Proof.
-    assert (D: Dec (exists (i: A -> B) (j: B -> A), retract '-> forall a:A, j (i a) = a)). {
-      apply DecExists. intros i.
-      apply DecExists. intros j.
-      apply dec_imp; apply dec_prop.
-    }
-    destruct D as [(i, (j, ?))|].
-    left. econstructor; eauto.
-    right. intros []. firstorder.
-  Qed.
-
-End Retracts.
-
-Arguments i {A} {B}.
-Arguments j {A} {B}.
-Arguments i2 {A} {B}.
-Arguments j2 {A} {B}.
-
-(* Commutation of implication & existential quantification *)
-Lemma L1: forall (A B:Prop) `{Dec A} `{Dec B}, retract_cond (pow A) (pow B).
-Proof. intros.
-  assert (Dec (retract (pow A) (pow B))) as [[i j HR]|HR].
-  apply dec_retract; exact _.
-  - exists i j. trivial.
-  - exists (fun _ _ => F) (fun _ _ => F). contradiction.
-Qed.
-
-
-(* Paradox set *)
-Let U := forall (P:Prop) `(Dec P), pow P.
-
-Local Instance dec_U: Dec U.
-Proof. unfold U.
-  apply DecForall. intros ?.
-  apply DecForall. intros ?.
-  apply dec_prop.
-Qed.
-
-Let f (u:U) : pow U := u U _.
-
-Let g (h:pow U) : U :=
-  fun X _ => let lX := j2 (L1 X U) in let rU := i2 (L1 U U) in lX (rU h).
-
-Lemma retract_pow_U_U : retract (pow U) U.
-Proof. exists g f.
-  intros ?. unfold f, g.
-  apply AC.
-  exists id id. auto.
-Qed.
-
-Local Instance dec_proof_p (P: Prop) `{Dec P} (p q: P): Dec (p = q).
-Proof. apply ProofDecidable. trivial. Qed.
-
-(* Russel paradox encoding *)
-Let Not_b (b:Bool) := IFProp (b = T) F T.
-
-Let R : U := g (fun u:U => Not_b (u U _ u)).
-
-Lemma not_has_fixpoint : R U _ R = Not_b (R U _ R).
-Proof.
-  unfold R at 1. unfold g.
-  rewrite AC. reflexivity.
-  exists id id. auto.
-Qed.
-
-Theorem classical_proof_irrelevance : T = F.
-Proof.
-  generalize not_has_fixpoint. unfold Not_b.
-  apply AC_IF.
-  - intros [] []. reflexivity.
-  - contradiction.
-Qed.
-
-End ProofIrrelevance.
-
-Lemma subs_eq_iff: forall U (P: U -> Prop) `(DecPred1 _ P) (x y: sig P),
-  get x = get y <-> x = y.
-Proof. intros. split.
-  - intros E. destruct x as [x' p], y as [y' q]. simpl in E; subst.
-    f_equal. apply classical_proof_irrelevance. apply H.
-  - intros ?. f_equal. trivial.
-Qed.
-
-(* Proof irrelevance gives usual setoid for subset *)
-Instance usual_subset U `(UsualSetoid U) (P: U -> Prop): UsualSetoid {x | P x}. Qed.
-
-Program Instance usual_dec_subset U `(UsualEqDec U) (P: U -> Prop) `(DecPred1 _ P):
-  UsualEqDec {x | P x}.
-Next Obligation with trivial.
-  intros ? ?. simpl. red. rewrite <- subs_eq_iff...
-  pose (D := decide (get x == get y))...
-Qed.
-
-
-Program Instance usual_dec_prod U V `(UsualEqDec U) `(UsualEqDec V):
-  UsualEqDec (U * V).
-Next Obligation.
-  intros (x, x') (y, y'). simpl. unfold decidable.
-  rewrite pair_equal_spec. pose proof (decide (x == y /\ x' == y')). trivial.
-Qed.

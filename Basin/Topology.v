@@ -1,11 +1,12 @@
 (* ----------------------------------------------------------------- *)
 (*                       Topological Spaces                          *)
+(*                                                                   *)
 (*  Based on Topology textbook by Munkres.                           *)
 (*  Changed order to fit better within constructive architecture.    *)
 (* ----------------------------------------------------------------- *)
 
 From Practice Require Import Basin.Base.
-From Practice Require Import Basin.DecClass.
+(* From Practice Require Import Basin.DecClass. *)
 From Practice Require Import Basin.Sets.
 From Practice Require Import Basin.SetLists.
 Require Import List.
@@ -68,6 +69,7 @@ Arguments intersect_open {X} {opens}.
 Definition covers {X} (V: ESet X) (C: Powerset X): Prop :=
   V <:= Unions C.
 Notation cover_all := (covers FullSet).
+
 
 (* ----------------------------------------------------------------- *)
 (*                       General Properties                          *)

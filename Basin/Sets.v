@@ -1,40 +1,52 @@
 From Practice Require Import Basin.Base.
-From Practice Require Import Basin.DecClass.
+(* From Practice Require Import Basin.DecClass. *)
+
+Axiom excluded_middle: forall P: Prop, P \/ ~P.
+
+Tactic Notation "decides" constr(x) :=
+  destruct (excluded_middle x).
+Tactic Notation "decides" constr(x) "as" simple_intropattern(y) :=
+  destruct (excluded_middle x) as y.
+
+Ltac contra := match goal with
+  | [ |- ?R ] => let c := fresh "contra" in decides R as [|c]; [easy | exfalso]
+  end.
+
+
+Generalizable All Variables.
+
 
 (* ----------------------------------------------------------------- *)
-(*                        ESet-Set definition                        *)
+(*                            Set definition                         *)
 (* ----------------------------------------------------------------- *)
 
-(* TODO: Perhaps use record format rather than this *)
-Record ESet (U:Type): Type := mkSetWith{
-  predOf: U -> Prop
-; decPf: DecPred1 predOf
-}.
+Record ESet (U:Type): Type := mkSet{ InSet: U -> Prop }.
 
-Arguments mkSetWith {U}.
-Arguments predOf {U}.
-Arguments decPf {U}.
+Arguments mkSet {U}.
+Arguments InSet {U}.
+(* Arguments predOf {U}. *)
+(* Arguments decPf {U}. *)
 
 Section ESetDef.
 Context {U:Type}.
 
-Definition mkSet (P: U -> Prop) `{pf: DecPred1 U P}: ESet U := mkSetWith P pf.
+(* Definition mkSet (P: U -> Prop) `{pf: DecPred1 U P}: ESet U := mkSetWith P pf. *)
 
-Definition InSet (A: ESet U) (x: U): Prop := predOf A x.
+(* Definition InSet (A: ESet U) (x: U): Prop := predOf A x. *)
 
-Property mkSet_In: forall P (pf: DecPred1 P), InSet (mkSetWith P pf) = P.
+(* Property mkSet_In: forall P (pf: DecPred1 P), InSet (mkSetWith P pf) = P.
 Proof. reflexivity. Qed.
 
 Property unwrap_mkin: forall P (pf: DecPred1 P) x, InSet (mkSetWith P pf) x -> P x.
 Proof. trivial. Qed.
 
 Property set_decide: forall (A: ESet U) x, decidable (InSet A x).
-Proof. apply decPf. Qed.
+Proof. apply decPf. Qed. *)
 
 End ESetDef.
 
-Instance decp_inset U: DecP2 (@InSet U).
-Proof. intros ? ?. apply set_decide. Qed.
+(* Instance decp_inset U: DecP2 (@InSet U).
+Proof. intros ? ?. apply set_decide. Qed. *)
 
 Notation "x ':in:' A" := (InSet A x) (at level 70, no associativity).
 
@@ -43,8 +55,8 @@ Program Instance setoid_set U: Setoid (ESet U) := {
 Next Obligation. unfold InSet.
   split; red; [ reflexivity | symmetry | etransitivity]; eauto. Qed.
 
-Instance setoid_dec_set U: DecSetoid (setoid_set U).
-Proof. intros ? ?. apply dec_prop. Qed.
+(* Instance setoid_dec_set U: DecSetoid (setoid_set U).
+Proof. intros ? ?. apply dec_prop. Qed. *)
 
 Add Parametric Morphism U: (@InSet U)
   with signature equiv ==> eq ==> iff as in_mor.
@@ -58,7 +70,7 @@ Proof. firstorder. Qed.
 Section ESetBasics.
 Context {U:Type}.
 
-Definition Include (B C: ESet U): Prop := forall x, x :in: B '-> x :in: C.
+Definition Include (B C: ESet U): Prop := forall x, x :in: B -> x :in: C.
 
 Definition EmptySet: ESet U := mkSet (const False).
 Definition FullSet: ESet U := mkSet (const True).
@@ -68,21 +80,21 @@ Definition Union (B C: ESet U): ESet U := mkSet (fun x => x :in: B \/ x :in: C).
 Definition Complement (B: ESet U): ESet U := mkSet (fun x => ~ x :in: B).
 Definition Setminus (B C: ESet U): ESet U := mkSet (fun x => x :in: B /\ ~ x :in: C).
 
-Definition Singleton `{DecSetoid U} (x: U): ESet U := mkSet (fun y => x == y).
+Definition Singleton `{Setoid U} (x: U): ESet U := mkSet (fun y => x == y).
 
 Inductive Inhabited (B: ESet U): Prop :=
   intro_inhabit: forall x, x :in: B -> Inhabited B.
 
 End ESetBasics.
 
-Instance decp_include U: DecP2 (@Include U).
-Proof. intros ? ?. apply dec_prop. Qed.
+(* Instance decp_include U: DecP2 (@Include U).
+Proof. intros ? ?. apply dec_prop. Qed. *)
 
 Instance preorder_inc U: PreOrder (@Include U).
 Proof. split; firstorder. Qed.
 
-Instance decp_inhabited U: DecP1 (@Inhabited U).
-Proof. intros S. decides (exists x, x :in: S); firstorder. Qed.
+(* Instance decp_inhabited U: DecP1 (@Inhabited U).
+Proof. intros S. decides (exists x, x :in: S); firstorder. Qed. *)
 
 Notation "'{|' x '|}'" := (Singleton x) (at level 0).
 Notation "'{|' x , .. , y , z '|}'" :=
@@ -112,7 +124,7 @@ Add Parametric Morphism U: (@Setminus U)
   with signature equiv ==> equiv ==> equiv as setminus_mor.
 Proof. firstorder. Qed.
 
-Add Parametric Morphism U `(DecSetoid U): (@Singleton U _ _)
+Add Parametric Morphism U `(Setoid U): (@Singleton U _)
   with signature equiv ==> equiv as single_mor.
 Proof. intros ** t. simpl. rw_refl. Qed.
 Add Parametric Morphism U: (@Inhabited U)
@@ -120,9 +132,9 @@ Add Parametric Morphism U: (@Inhabited U)
 Proof. firstorder. Qed.
 
 #[export]
-Hint Unfold predOf mkSet InSet Include: sets.
-#[export]
-Hint Resolve mkSet_In set_decide: sets.
+Hint Unfold InSet Include: sets.
+(* #[export]
+Hint Resolve mkSet_In set_decide: sets. *)
 
 (* ----------------------------------------------------------------- *)
 (*                      Set Operation Properties                     *)
@@ -148,7 +160,7 @@ Proof. firstorder. Qed.
 Property setminus_iff: forall (B C: ESet U) x,
   x :in: B \\ C <-> x :in: B /\ ~ x :in: C.
 Proof. firstorder. Qed.
-Property singleton_iff: forall `(DecSetoid U) (x y: U),
+Property singleton_iff: forall `(Setoid U) (x y: U),
   y :in: {| x |} <-> x == y.
 Proof. firstorder. Qed.
 
@@ -225,7 +237,7 @@ Proof. firstorder. Qed.
 
 (* Singleton properties *)
 
-Lemma singleton_def: forall U `(DecSetoid U) (x: U), x :in: {| x |}.
+Lemma singleton_def: forall U `(Setoid U) (x: U), x :in: {| x |}.
 Proof. simpl. reflexivity. Qed.
 
 (* Inhabited properties *)
@@ -258,7 +270,6 @@ Hint Resolve <- same_inc_iff
 (*                    Proper sets & Power Sets                       *)
 (* ----------------------------------------------------------------- *)
 
-(* TODO Proper set as a class *)
 (* Condition of Proper set *)
 Class ProperSet {U} `{Setoid U} (P: ESet U): Prop :=
   set_proper: Morphisms.Proper (equiv ==> iff) (InSet P).
@@ -268,7 +279,7 @@ Add Parametric Morphism U (P: ESet U) `{ProperSet _ P}: (InSet P)
   with signature equiv ==> iff as proper_in_mor.
 Proof. firstorder. Qed.
 
-Instance proper_singleton U `{DecSetoid U} (x: U): ProperSet {| x |}.
+Instance proper_singleton U `{Setoid U} (x: U): ProperSet {| x |}.
 Proof. intros ? **. rewrite 2 singleton_iff. rw_refl. Qed.
 
 Instance proper_union U `{S: Setoid U} (A B: ESet U) `(@ProperSet _ S A) `(@ProperSet _ S B):
@@ -284,13 +295,13 @@ Proof. intros ? **. rewrite 2 compl_iff. rw_refl. Qed.
 
 
 (* Proper form of a given set *)
-Definition properForm {U} `{DecSetoid U} (P: ESet U): ESet U :=
-  mkSetWith (fun x => exists y, y :in: P /\ y == x) (fun x => decide _).
+Definition properForm {U} `{Setoid U} (P: ESet U): ESet U :=
+  mkSet (fun x => exists y, y :in: P /\ y == x).
 
-Instance properform_proper U `{DecSetoid U} (P: ESet U): ProperSet (properForm P).
+Instance properform_proper U `{Setoid U} (P: ESet U): ProperSet (properForm P).
 Proof. intros ? ? ?. split; intros [? []]; eexists; all_rewrite; eauto. Qed.
 
-Add Parametric Morphism U `(DecSetoid U): (@properForm U _ _)
+Add Parametric Morphism U `(Setoid U): (@properForm U _)
   with signature equiv ==> equiv as proper_mor.
 Proof. firstorder. Qed.
 
@@ -318,15 +329,15 @@ Hint Resolve -> pseton_in_iff: sets.
 (*        Qualification over Powersets & Union over Powersets        *)
 (* ----------------------------------------------------------------- *)
 
-Definition ExistsIn {U:Type} (A: ESet U) (P: U -> Prop): Prop :=
+Definition ExistsIn {U} (A: ESet U) (P: U -> Prop): Prop :=
   exists x: U, x :in: A /\ P x.
-Definition ForallIn {U:Type} (A: ESet U) (P: U -> Prop): Prop :=
-  forall x: U, x :in: A '-> P x.
+Definition ForallIn {U} (A: ESet U) (P: U -> Prop): Prop :=
+  forall x: U, x :in: A -> P x.
 
 Definition Unions {U} (F: Powerset U): ESet U :=
-  mkSetWith (fun x => ExistsIn F (fun A => x :in: A)) (fun x => decide _).
+  mkSet (fun x => ExistsIn F (fun A => x :in: A)).
 Definition Intersects {U} (F: Powerset U): ESet U :=
-  mkSetWith (fun x => ForallIn F (fun A => x :in: A)) (fun x => decide _).
+  mkSet (fun x => ForallIn F (fun A => x :in: A)).
 
 Add Parametric Morphism U: (@Unions U)
   with signature equiv ==> equiv as unions_mor.
@@ -415,13 +426,13 @@ Hint Resolve <- unions_iff intersects_iff: sets.
 (* ----------------------------------------------------------------- *)
 
 Section Mapping.
-Context {U:Type} {V:Type}.
+Context {U V:Type}.
 
 Section DecMapping.
-Context `{DecSetoid V}.
+Context `{Setoid V}.
 
 Definition Im (f: U -> V) (X: ESet U): ESet V :=
-  mkSetWith (fun y => ExistsIn X (fun x => y == f x)) (fun x => decide _).
+  mkSet (fun y => ExistsIn X (fun x => y == f x)).
 
 (* For manual unfolding *)
 Property im_iff: forall (X: ESet U) (f: U -> V) (y: V),
@@ -450,15 +461,15 @@ Proof. firstorder. Qed.
 
 End DecMapping.
 
-Lemma forall_im_iff: forall `(UsualEqDec V) (A: ESet U) (f: U -> V) (P: V -> Prop),
+Lemma forall_im_iff: forall `(UsualSetoid V) (A: ESet U) (f: U -> V) (P: V -> Prop),
   ForallIn (Im f A) P <-> ForallIn A (fun x => P (f x)).
 Proof. unfold ForallIn, impl. firstorder.
-  rewrite usualeq_spec in *; subst. auto. Qed.
+  rewrite usualeq_spec in H2; subst. auto. Qed.
 
-Lemma exists_im_iff: forall `(UsualEqDec V) (A: ESet U) (f: U -> V) (P: V -> Prop),
+Lemma exists_im_iff: forall `(UsualSetoid V) (A: ESet U) (f: U -> V) (P: V -> Prop),
   (exists y, y :in: Im f A /\ P y) <-> (exists x, x :in: A /\ P (f x)).
 Proof. unfold ForallIn, impl. firstorder.
-  rewrite usualeq_spec in *; subst. eauto. Qed.
+  rewrite usualeq_spec in H2; subst. eauto. Qed.
 
 
 Definition InvIm (f: U -> V) (Y: ESet V): ESet U :=
@@ -490,13 +501,13 @@ Lemma invim_inc: forall (f: U -> V) (A B: ESet V),
 Proof. firstorder. Qed.
 
 
-Lemma invim_of_im_inc: forall `(DecSetoid V) (f: U -> V) (A: ESet U),
+Lemma invim_of_im_inc: forall `(Setoid V) (f: U -> V) (A: ESet U),
   InvIm f (Im f A) =:> A.
 Proof. firstorder. Qed.
 
-Lemma im_of_invim_inc: forall `(UsualEqDec V) (f: U -> V) (B: ESet V),
+Lemma im_of_invim_inc: forall `(UsualSetoid V) (f: U -> V) (B: ESet V),
   Im f (InvIm f B) <:= B.
-Proof. intros * x [? []]. rewrite usualeq_spec in *; subst. auto. Qed.
+Proof. intros * x [? []]. rewrite usualeq_spec in H1; subst. auto. Qed.
 
 
 Lemma invim_compl: forall (f: U -> V) (P: ESet V),
@@ -505,11 +516,11 @@ Proof. firstorder. Qed.
 
 End Mapping.
 
-Instance proper_im U V `{DecSetoid V} (X: ESet U) (f: U -> V): ProperSet (Im f X).
+Instance proper_im U V `{Setoid V} (X: ESet U) (f: U -> V): ProperSet (Im f X).
 Proof. intros ** ? **. split; intros [? []]; eexists; split; try etransitivity; eauto. Qed.
 
 
-Add Parametric Morphism U V `(DecSetoid V): (@Im U V _ _)
+Add Parametric Morphism U V `(Setoid V): (@Im U V _)
   with signature equiv ==> equiv ==> equiv as im_mor.
 Proof. intros ** s. split.
   all: intros [t (? & ?)]; rewrite H3.
@@ -526,13 +537,13 @@ Add Parametric Morphism U V: (@InvIm U V)
 Proof. firstorder. Qed.
 
 
-Lemma im_identity: forall U (A: ESet U) `(UsualEqDec U), Im id A == A.
+Lemma im_identity: forall U (A: ESet U) `(UsualSetoid U), Im id A == A.
 Proof. intros * ?. firstorder. rewrite H1. auto. Qed.
 
 Lemma invim_identity: forall U (A: ESet U), InvIm id A == A.
 Proof. firstorder. Qed.
 
-Lemma im_compose: forall U V W `(DV: UsualEqDec V) `(DW: UsualEqDec W),
+Lemma im_compose: forall U V W `(DV: UsualSetoid V) `(DW: UsualSetoid W),
   forall (A: ESet U) (f: U -> V) (g: V -> W),
   Im (compose g f) A == Im g (Im f A).
 Proof. intros * ?. firstorder. rewrite H0, H1. firstorder. Qed.
@@ -542,14 +553,14 @@ Lemma invim_compose: forall U V W (C: ESet W) (f: U -> V) (g: V -> W),
 Proof. firstorder. Qed.
 
 
-Lemma invim_of_im_eq_inj: forall U V `(D: UsualEqDec V) (f: U -> V) (A: ESet U),
+Lemma invim_of_im_eq_inj: forall U V `(D: UsualSetoid V) (f: U -> V) (A: ESet U),
   injective f -> InvIm f (Im f A) == A.
 Proof. intros ** x. rewrite invim_iff. split.
   - intros (x' & ? & ->%H). trivial.
   - intros. apply im_def. trivial.
 Qed.
 
-Lemma im_of_invim_eq_surj: forall U V `(D: UsualEqDec V) (f: U -> V) (B: ESet V),
+Lemma im_of_invim_eq_surj: forall U V `(D: UsualSetoid V) (f: U -> V) (B: ESet V),
   surjective f -> Im f (InvIm f B) == B.
 Proof. intros ** y. split.
   - intros (x & ? & ->). trivial.
@@ -558,7 +569,7 @@ Qed.
 
 
 (* Indexed, synonym for image, and its alternative notation *)
-Definition Indexed {U V} `{DecSetoid V} (P: ESet U) (f: U -> V) :=
+Definition Indexed {U V} `{Setoid V} (P: ESet U) (f: U -> V) :=
   Im f P.
 
 Notation "'{''  E '|' x 'in' P  ''}'" :=
@@ -645,14 +656,14 @@ Lemma intersects_as_over: forall U (F: Powerset U),
 Proof. firstorder. Qed.
 
 
-Lemma im_unionover: forall I U V `(DecSetoid V) (f: U -> V) (A: ESet I) (P: I -> ESet U),
+Lemma im_unionover: forall I U V `(Setoid V) (f: U -> V) (A: ESet I) (P: I -> ESet U),
   Im f (unions i in A, P i) == unions i in A, Im f (P i).
 Proof.
   intros ** y. rewrite im_iff.
   setoid_rewrite unionover_iff. firstorder.
 Qed.
 
-Lemma im_intersectover: forall I U V `(DecSetoid V) (f: U -> V) (A: ESet I) (P: I -> ESet U),
+Lemma im_intersectover: forall I U V `(Setoid V) (f: U -> V) (A: ESet I) (P: I -> ESet U),
   Im f (intersects i in A, P i) <:= intersects i in A, Im f (P i).
 Proof.
   intros ** y. rewrite im_iff.
@@ -682,7 +693,7 @@ Proof.
 Qed.
 (* NOTE: Any inclusion for intersects & intersectover does not hold *)
 
-Lemma set_unionover: forall U `(UsualEqDec U) (A: ESet U),
+Lemma set_unionover: forall U `(UsualSetoid U) (A: ESet U),
   A == unions x in A, {| x |}.
 Proof. intros ** x. rewrite unionover_iff.
   firstorder. destruct H1. trivial. Qed.
@@ -814,11 +825,11 @@ Definition inclu {U} {A: ESet U}: Subset A -> U := get.
 
 Lemma subs_eq: forall U (A: ESet U) (x y: Subset A),
   inclu x = inclu y <-> x = y.
-Proof. intros. apply subs_eq_iff. exact _. Qed.
+Proof. intros. symmetry. apply sig_eq_iff. Qed.
 
 
 Section Subset.
-Context {U:Type} `(UsualEqDec U) {A: ESet U}.
+Context {U:Type} `(UsualSetoid U) {A: ESet U}.
 
 Lemma incl_im_of_invim: forall B, Im (@inclu _ A) (InvIm inclu B) == A //\\ B.
 Proof.
@@ -857,7 +868,7 @@ Section AProd.
 Context {U:Type} {V:Type}.
 
 Definition Product (A: ESet U) (B: ESet V): ESet (U * V) :=
-  mkSetWith (fun '(x, y) => x :in: A /\ y :in: B) (fun '(x, y) => (decide _)).
+  mkSet (fun '(x, y) => x :in: A /\ y :in: B).
 
 (* For rewrite / application *)
 Property prod_iff: forall x y A B, (x, y) :in: Product A B <-> x :in: A /\ y :in: B.
@@ -908,14 +919,14 @@ Lemma prod_inc_distr: forall (A C: ESet U) (B D: ESet V),
 Proof. intros ** []. firstorder. Qed.
 
 
-Lemma im_fst_prod: forall (A: ESet U) (B: ESet V) `(UsualEqDec U),
+Lemma im_fst_prod: forall (A: ESet U) (B: ESet V) `(UsualSetoid U),
   Inhabited B -> Im fst (A ** B) == A.
 Proof. intros * [y] x. split.
   - intros [? (? & ->)]. eauto using prod_fst_in.
   - exists (x, y). firstorder.
 Qed.
 
-Lemma im_snd_prod: forall (A: ESet U) (B: ESet V) `(UsualEqDec V),
+Lemma im_snd_prod: forall (A: ESet U) (B: ESet V) `(UsualSetoid V),
   Inhabited A -> Im snd (A ** B) == B.
 Proof. intros * [x] y. split.
   - intros [? (? & ->)]. eauto using prod_snd_in.
@@ -937,14 +948,14 @@ Lemma prod_intersect_exch: forall (A C: ESet U) (B D: ESet V),
 Proof. intros ** []. firstorder. Qed.
 
 
-Lemma indexed_prod_comm: forall S `(DecSetoid S) (P: ESet U) (Q: ESet V) (f: U -> V -> S),
+Lemma indexed_prod_comm: forall S `(Setoid S) (P: ESet U) (Q: ESet V) (f: U -> V -> S),
   {' f x y | '(x, y) in P ** Q '} == {' f x y | '(y, x) in Q ** P '}.
 Proof. intros ** t. split.
   all: intros [[] []]; rewrite H1.
   all: exists (v, u) || exists (u, v); firstorder.
 Qed.
 
-Lemma indexed_prod_assoc: forall W S `(DecSetoid S)
+Lemma indexed_prod_assoc: forall W S `(Setoid S)
   (P: ESet U) (Q: ESet V) (R: ESet W) (f: U -> V -> W -> S),
   {' f x y z | '(x, (y, z)) in P ** (Q ** R) '} ==
   {' f x y z | '(x, y, z) in P ** Q ** R '}.

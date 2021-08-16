@@ -1,8 +1,20 @@
+(* ----------------------------------------------------------------- *)
+(*                   Mainly classical Base module                    *)
+(* ----------------------------------------------------------------- *)
+
 Require Export Basics.
 Require Export Setoid.
 Require Export SetoidClass.
 Require Export RelationClasses.
-Require List.
+
+Require Export PeanoNat.
+Require Export Lia.
+
+Require Import List.
+Import ListNotations.
+
+
+Generalizable All Variables.
 
 (* Rewrite tactics *)
 (* Setoid_rewrites all occurrences, until it meets True. Renames hypothesis. *)
@@ -21,88 +33,100 @@ Ltac all_rewrite := let BLOCK := True in
 (* Rewrites all occurrences to match for reflexivity. *)
 Ltac rw_refl := all_rewrite; reflexivity.
 
-Property setoid_refl (U:Type) `(Setoid U): forall x, x == x.
+Property setoid_refl `(Setoid U): forall x, x == x.
 Proof. reflexivity. Qed.
-Property setoid_sym (U:Type) `(Setoid U): forall x y, x == y -> y == x.
+Property setoid_sym `(Setoid U): forall x y, x == y -> y == x.
 Proof. symmetry. auto. Qed.
-Property setoid_trans (U:Type) `(Setoid U): forall x y z, x == y -> y == z -> x == z.
+Property setoid_trans `(Setoid U): forall x y z, x == y -> y == z -> x == z.
 Proof. etransitivity; eauto. Qed.
 
 #[export]
 Hint Immediate setoid_refl setoid_sym setoid_trans: core.
 
 
+Axiom proof_irrelevance: forall P: Prop, forall pf pf': P, pf = pf'.
+
+
 (* Setoid for leibniz equality *)
 
 Class UsualSetoid (U:Type) := {}.
 
-Instance usual_prod U V `(UsualSetoid U) `(UsualSetoid V): UsualSetoid (U * V). Qed.
+Instance usual_sum `(UsualSetoid U) `(UsualSetoid V): UsualSetoid (U + V). Qed.
+Instance usual_prod `(UsualSetoid U) `(UsualSetoid V): UsualSetoid (U * V). Qed.
 
-Program Instance setoid_usual U `(UsualSetoid U): Setoid U := {
+Instance usual_nat: UsualSetoid nat. Qed.
+
+Instance usual_sig `(UsualSetoid U) (P: U -> Prop): UsualSetoid (sig P). Qed.
+
+
+Program Instance setoid_usual `(UsualSetoid U): Setoid U := {
   equiv := eq
 }.
 
-Property usualeq_spec: forall U `(UsualSetoid U) (x y: U), (x == y) = (x = y).
+Property usualeq_spec: forall `(UsualSetoid U) (x y: U), (x == y) = (x = y).
 Proof. reflexivity. Qed.
 
-(* Function, Subset *)
 
-Program Instance setoid_function U V `(Setoid V): Setoid (U -> V) := {
+(* Sig type *)
+
+Definition mkSig `(x: U) {P: U -> Prop} (pf: P x): {x | P x} :=
+  exist P x pf.
+Definition get `(pf: {x: U | P x}): U :=
+  proj1_sig pf.
+Definition getPr `(pf: {x: U | P x}): P (get pf) :=
+  proj2_sig pf.
+
+Property sig_eq_iff: forall U P (x y: { t: U | P t }),
+  x = y <-> get x = get y.
+Proof. split.
+  - intros ->. reflexivity.
+  - destruct x, y; simpl. intros ->. f_equal. apply proof_irrelevance. Qed.
+
+
+(* Function type - considered normal setoid *)
+
+Program Instance setoid_function U `(Setoid V): Setoid (U -> V) := {
   equiv := fun f g => forall u, f u == g u }.
 Next Obligation. split; red; eauto. Qed.
-Add Parametric Morphism U V `(Setoid V): (fun (f: U -> V) (x: U) => f x)
+Add Parametric Morphism U `(Setoid V): (fun (f: U -> V) (x: U) => f x)
   with signature equiv ==> eq ==> equiv as apply_mor.
 Proof. auto. Qed.
 
-(* Program Instance setoid_sub U (P: U -> Prop) `(Setoid U): Setoid (sig P) := {
-  equiv := fun x y => proj1_sig x == proj1_sig y
-}.
-Next Obligation. split; red; eauto. Qed. *)
-
-(* Shorthand for sig types *)
-Definition get {U:Type} {P: U -> Prop} (pf: sig P): U
-  := proj1_sig pf.
-Definition getPr {U:Type} {P: U -> Prop} (pf: sig P): P (get pf)
-  := proj2_sig pf.
-
-(* Add Parametric Morphism U (P: U -> Prop) `(Setoid U): (@get U P)
-  with signature equiv ==> equiv as get_mor.
-Proof. auto. Qed. *)
 
 #[export]
 Hint Unfold setoid_usual setoid_function: core.
 #[export]
-Hint Resolve usualeq_spec: core.
+Hint Resolve usualeq_spec sig_eq_iff: core.
 
 
 (* Injective & Surjective *)
-Definition injective {U V} (f: U -> V): Prop :=
+Definition injective `(f: U -> V): Prop :=
   forall x x': U, f x = f x' -> x = x'.
 
-Definition surjective {U V} (f: U -> V): Prop :=
+Definition surjective `(f: U -> V): Prop :=
   forall y: V, exists x: U, y = f x.
 
-Definition bijective {U V} (f: U -> V): Prop :=
+Definition bijective `(f: U -> V): Prop :=
   injective f /\ surjective f.
 
 
-Lemma bi_unique_inv: forall U V (f: U -> V) (y: V),
+Lemma bi_unique_inv: forall `(f: U -> V) (y: V),
   bijective f -> exists ! x, y = f x.
 Proof. intros * [I S].
   specialize (S y) as [x ->]. exists x. split; auto. Qed.
 
-Lemma left_inv_then_inj: forall U V (f: U -> V) (g: V -> U),
+Lemma left_inv_then_inj: forall `(f: U -> V) (g: V -> U),
   (forall x, g (f x) = x) -> injective f.
 Proof. intros ** x x' E. rewrite <- (H x), <- (H x'). f_equal. trivial. Qed.
 
-Lemma right_inv_then_surj: forall U V (f: U -> V) (g: V -> U),
+Lemma right_inv_then_surj: forall `(f: U -> V) (g: V -> U),
   (forall y, f (g y) = y) -> surjective f.
 Proof. intros ** y. exists (g y). easy. Qed.
 
 
-(* Below may not be used *)
-
-Fixpoint generalize_all {T} (l: Tlist) (x: T): arrows l T :=
+(*
+  Not used
+Fixpoint generalize_all (l: Tlist) (x: T): arrows l T :=
   match l with
   | Tnil => x
   | Tcons A tl => fun a => generalize_all tl x
@@ -129,13 +153,10 @@ Notation "'[:' U , .. , V ':]'" := (Tcons U .. (Tcons V Tnil) ..)
 
 #[export]
 Hint Unfold generalize_all pointwise_ext pointwise_ext2: core.
+*)
 
 
-Module TFAE.
-
-Import List.
-Import ListNotations.
-
+(* The following are equivalent *)
 Definition TFAE (l: list Prop) : Prop :=
   forall n m : nat, nth n l False -> nth m l True.
 
@@ -173,5 +194,3 @@ Lemma tfae_then_any: forall (n m: nat) (l: list Prop),
   TFAE l -> nth n l False -> nth m l True.
 Proof. firstorder. Qed.
 
-
-End TFAE.

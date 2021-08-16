@@ -6,7 +6,7 @@ Require Import List.
 Import ListNotations.
 
 (* Forall & Exists over list as decidable proposition *)
-Instance decp1_forall_list {U} (P: U -> Prop) `(DecPred1 U P): DecP1 (Forall P).
+(* Instance decp1_forall_list {U} (P: U -> Prop) `(DecPred1 U P): DecP1 (Forall P).
 Proof with (auto with datatypes).
   intros l. induction l.
   - left...
@@ -22,7 +22,7 @@ Proof with (auto with datatypes).
   - destruct (H a), IHl;
     [left | left | left | right]...
     now inversion 1.
-Qed.
+Qed. *)
 
 (* Set of lists where each element is in a set *)
 Definition ForallSet {U} (T: ESet U): ESet (list U) :=
