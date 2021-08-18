@@ -2,7 +2,6 @@
 (*                       Topological Spaces                          *)
 (*                                                                   *)
 (*  Based on Topology textbook by Munkres.                           *)
-(*  Changed order to fit better within constructive architecture.    *)
 (* ----------------------------------------------------------------- *)
 
 From Practice Require Import Basin.Base.
@@ -44,12 +43,10 @@ Instance proper_closes X F (T: Topolike X F): ProperSet (closes(T)).
 Proof. intros ? **. unfold closes, InSet. rw_refl. Qed.
 
 
-(* Open *)
-Definition open {X F} (T: Topolike X F): ESet X -> Prop :=
-  InSet (opens T).
-(* Closed <-> complement is open *)
-Definition closed {X F} (T: Topolike X F): ESet X -> Prop :=
-  InSet (closes T).
+Notation "'open' [ T ]" := (InSet (opens T))
+  (format "'open' [ T ]").
+Notation "'closed' [ T ]" := (InSet (closes T))
+  (format "'closed' [ T ]").
 
 
 Record isTopology {X} (opens: Powerset X): Prop := {
@@ -78,57 +75,57 @@ Section Topo.
 Context {X:Type} (T: Topology X).
 
 (* Restatements *)
-Property empty_is_open: open(T) EmptySet.
+Property empty_is_open: open[T] EmptySet.
 Proof. apply empty_open, topo_cond. Qed.
 
-Property full_is_open: open(T) FullSet.
+Property full_is_open: open[T] FullSet.
 Proof. apply full_open, topo_cond. Qed.
 
-Property unions_is_open: forall M: Powerset X, ForallIn M (open T) -> open(T) (Unions M).
+Property unions_is_open: forall M: Powerset X, ForallIn M (open[T]) -> open[T] (Unions M).
 Proof. apply union_open, topo_cond. Qed.
 
-Property intersect_is_open: forall U V: ESet X, open(T) U -> open(T) V -> open(T) (U //\\ V).
+Property intersect_is_open: forall U V: ESet X, open[T] U -> open[T] V -> open[T] (U //\\ V).
 Proof. apply intersect_open, topo_cond. Qed.
 
 
-Lemma union_is_open: forall U V: ESet X, open(T) U -> open(T) V -> open(T) (U \\// V).
+Lemma union_is_open: forall U V: ESet X, open[T] U -> open[T] V -> open[T] (U \\// V).
 Proof. intros.
   rewrite <- unions_couple. apply unions_is_open.
   intros ? [K|K]; do 2 red in K; rewrite <- K; auto.
 Qed.
 
 Lemma unionover_is_open: forall I (P: ESet I) (F: I -> ESet X),
-  ForallIn P (fun x => open(T) (F x)) -> open(T) (unions x in P, F x).
+  ForallIn P (fun x => open[T] (F x)) -> open[T] (unions x in P, F x).
 Proof. intros * H. apply unions_is_open.
   intros _ (x & ? & ->). apply H. trivial. Qed.
 
 
 (* Property of closed sets *)
-Lemma empty_is_closed: closed(T) EmptySet.
+Lemma empty_is_closed: closed[T] EmptySet.
 Proof. do 3 red. rewrite empty_compl. apply full_is_open. Qed.
 
-Lemma full_is_closed: closed(T) FullSet.
+Lemma full_is_closed: closed[T] FullSet.
 Proof. do 3 red. rewrite full_compl. apply empty_is_open. Qed.
 
 Lemma intersects_is_closed: forall M: Powerset X,
-  ForallIn M (closed(T)) -> closed(T) (Intersects M).
+  ForallIn M (closed[T]) -> closed[T] (Intersects M).
 Proof. intros. do 3 red.
   rewrite intersects_as_over, intersectover_compl.
   apply unionover_is_open. firstorder.
 Qed.
 
-Lemma union_is_closed: forall U V: ESet X, closed(T) U -> closed(T) V -> closed(T) (U \\// V).
+Lemma union_is_closed: forall U V: ESet X, closed[T] U -> closed[T] V -> closed[T] (U \\// V).
 Proof. intros. do 3 red. rewrite union_compl.
   apply intersect_is_open; auto. Qed.
 
 
 Lemma intersect_is_closed: forall U V: ESet X,
-  closed(T) U -> closed(T) V -> closed(T) (U //\\ V).
+  closed[T] U -> closed[T] V -> closed[T] (U //\\ V).
 Proof. intros. do 3 red. rewrite intersect_compl.
   apply union_is_open; auto. Qed.
 
 Lemma intersectover_is_closed: forall I (P: ESet I) (F: I -> ESet X),
-  ForallIn P (fun x => closed(T) (F x)) -> closed(T) (intersects x in P, F x).
+  ForallIn P (fun x => closed[T] (F x)) -> closed[T] (intersects x in P, F x).
 Proof. intros * H. apply intersects_is_closed.
   intros _ (x & ? & ->). apply H. trivial. Qed.
 
@@ -305,7 +302,7 @@ End Base.
 (* ----------------------------------------------------------------- *)
 
 Definition Continuous {X Y} (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
-  ForallIn (opens(T)) (fun V => open(S) (InvIm f V)).
+  ForallIn (opens(T)) (fun V => InvIm f V :in: opens(S)).
 
 Notation "f ':-' S '~>' T" := (Continuous S T f)
   (at level 75, no associativity).
@@ -324,7 +321,7 @@ Qed.
 
 
 Lemma basis_invim_conti: forall X Y (S: Topology X) (B: Basis Y) (f: X -> Y),
-  ForallIn (opens(B)) (fun V => open(S) (InvIm f V)) ->
+  ForallIn (opens(B)) (fun V => open[S] (InvIm f V)) ->
   f :- S ~> topoByBase B.
 Proof.
   intros ** V (F & HV1 & ->)%open_iff_base_unions.
@@ -333,7 +330,7 @@ Proof.
 Qed.
 
 Lemma subbasis_invim_conti: forall X Y (S: Topology X) (B: Subbasis Y) (f: X -> Y),
-  ForallIn (opens(B)) (fun V => open(S) (InvIm f V)) ->
+  ForallIn (opens(B)) (fun V => open[S] (InvIm f V)) ->
   f :- S ~> topoByBase (baseBySubbase B).
 Proof.
   intros **. apply basis_invim_conti.
@@ -369,7 +366,7 @@ Section UsualMap.
 Context {X Y: Type} `{D: UsualSetoid Y}.
 
 Definition OpenMap (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
-  ForallIn (opens(S)) (fun U => open(T) (Im f U)).
+  ForallIn (opens(S)) (fun U => open[T] (Im f U)).
 
 Definition Homeomorphism (S: Topology X) (T: Topology Y) (f: X -> Y): Prop :=
   bijective f /\ Continuous S T f /\ OpenMap S T f.
@@ -453,7 +450,7 @@ Section UsualEq.
 Context `{UsualSetoid X}.
 
 Lemma open_subsp_open_whole: forall U: ESet (Subset A),
-  open(T) A -> open(SubspaceT) U -> open(T) (Im inclu U).
+  open[T] A -> open[SubspaceT] U -> open[T] (Im inclu U).
 Proof with (auto with sets).
   intros * ? [V [? ->]]%im_iff.
   rewrite incl_im_of_invim. apply intersect_is_open...
@@ -471,13 +468,13 @@ Proof with (auto with sets).
     rewrite HE, invim_compl. apply im_def...
 Qed.
 Corollary closed_subsp_iff: forall (F: ESet (Subset A)),
-  closed(SubspaceT) F <-> ExistsIn (closes(T)) (fun E => F == InvIm inclu E).
-Proof. intros. unfold closed. rewrite closes_subsp_is. firstorder. Qed.
+  closed[SubspaceT] F <-> ExistsIn (closes(T)) (fun E => F == InvIm inclu E).
+Proof. intros. rewrite closes_subsp_is. firstorder. Qed.
 
 Lemma closed_subsp_closed_whole: forall (E: ESet (Subset A)),
-  closed(T) A -> closed(SubspaceT) E -> closed(T) (Im inclu E).
+  closed[T] A -> closed[SubspaceT] E -> closed[T] (Im inclu E).
 Proof with (eauto with sets).
-  intros * ?. unfold closed. rewrite closes_subsp_is.
+  intros * ?. rewrite closes_subsp_is.
   intros [F [? ->]]%im_iff.
   rewrite incl_im_of_invim. apply intersect_is_closed...
 Qed.
@@ -712,16 +709,16 @@ Proof. firstorder. Qed.
 Property closure_out: forall A, Closure A =:> A.
 Proof. firstorder. Qed.
 
-Property interior_eq_iff: forall A, open(T) A <-> Interior A == A.
+Property interior_eq_iff: forall A, open[T] A <-> Interior A == A.
 Proof. firstorder. rewrite <- H. apply unions_is_open. firstorder. Qed.
 
-Property closure_eq_iff: forall A, closed(T) A <-> Closure A == A.
+Property closure_eq_iff: forall A, closed[T] A <-> Closure A == A.
 Proof. firstorder. rewrite <- H. apply intersects_is_closed. firstorder. Qed.
 
-Property interior_open: forall A, open(T) (Interior A).
+Property interior_open: forall A, open[T] (Interior A).
 Proof. intros. apply unions_is_open. firstorder. Qed.
 
-Property closure_closed: forall A, closed(T) (Closure A).
+Property closure_closed: forall A, closed[T] (Closure A).
 Proof. intros. apply intersects_is_closed. firstorder. Qed.
 
 
@@ -733,23 +730,25 @@ Proof. intros ** x ? E []. apply H0. firstorder. Qed.
 
 End TopoStr.
 
-Notation "'Int' [ T ]" := (Interior T).
-Notation "'Cl' [ T ]" := (Closure T).
+Notation "'Int' [ T ]" := (Interior T)
+  (format "'Int' [ T ]").
+Notation "'Cl' [ T ]" := (Closure T)
+  (format "'Cl' [ T ]").
 
 Lemma subspace_closure: forall X `(D: UsualSetoid X) T (Y: ESet X) (A: ESet (Subset Y)),
   let S := SubspaceT T Y in
   Cl[S] A == InvIm inclu (Cl[T] (Im inclu A)).
 Proof with (auto with sets).
   intros. apply same_inc_iff. split.
-  - (* Cl[S] A <:= Cl A /\ Y *)
+  - (* Cl[S] A <:= Cl[T] A /\ Y *)
     set (E := Cl[T] (Im inclu A)).
     apply intersects_inced_one. split.
     apply closes_subsp_is, im_def, closure_closed.
     rewrite mkSet_In, <- (incl_invim_of_im _ A).
     apply invim_inc, closure_out.
-  - (* Cl[S] A =:> Cl A /\ Y *)
+  - (* Cl[S] A =:> Cl[T] A /\ Y *)
     set (B := Cl[S] A).
-    assert (closed(S) B) as (C & HC & HE)%closed_subsp_iff by apply closure_closed...
+    assert (closed[S] B) as (C & HC & HE)%closed_subsp_iff by apply closure_closed...
     rewrite HE. apply invim_inc, intersects_inced_one.
     split... rewrite mkSet_In. transitivity (Y //\\ C)...
     rewrite <- incl_im_of_invim. apply im_inc.
@@ -784,7 +783,8 @@ Qed.
 Definition Neighborhood {X} (T: Topology X) x: Powerset X :=
   {: U in opens(T) | x :in: U :}.
 
-Notation "'nbhd' [ T ]" := (Neighborhood T).
+Notation "'nbhd' [ T ]" := (Neighborhood T)
+  (format "'nbhd' [ T ]").
 
 Corollary closure_nbhd: forall X T (A: ESet X) x,
   x :in: Cl[T] A <-> ForallIn (nbhd[T] x) (fun U => Inhabited (A //\\ U)).
@@ -799,7 +799,7 @@ Theorem tfae_continuity:
   TFAE [
       Continuous S T f
     ; forall A: ESet X, Im f (Cl[S] A) <:= Cl[T] (Im f A)
-    ; ForallIn (closes(T)) (fun E => closed(S) (InvIm f E))
+    ; ForallIn (closes(T)) (fun E => InvIm f E :in: closes(S))
   ].
 Proof with (auto 4 with sets).
   intros. tfae_chain.
@@ -866,7 +866,7 @@ Proof with (auto with sets).
     intros x Hx. apply closure_nbhd. firstorder.
 Qed.
 Corollary closed_iff_limit: forall (E: ESet X),
-  closed(T) E <-> LimitPts E <:= E.
+  closed[T] E <-> LimitPts E <:= E.
 Proof. intros. rewrite closure_eq_iff, closure_limit_rel. firstorder. Qed.
 
 
@@ -879,7 +879,7 @@ Definition Hausdorff: Prop :=
 
 
 Theorem hausdorff_single_closed: forall x,
-  Hausdorff -> closed(T) {|x|}.
+  Hausdorff -> closed[T] {|x|}.
 Proof with (auto with sets).
   intros x Haus. set (C := Cl[T] {|x|}).
   enough (Claim: C <:= {|x|}).
@@ -893,8 +893,8 @@ Qed.
 (*
 Following requires cardinarlity:
 Theorem limit_pt_nbhd_iff: forall A x,
-  (forall t, closed(T) {|t|}) ->
-  IsLimit A x <-> ForallIn (Neighborhood x) (fun U => A //\\ U).
+  (forall t, closed[T] {|t|}) ->
+  IsLimit A x <-> ForallIn (nbhd[T] x) (fun U => A //\\ U).
 Proof.
   
 Qed.

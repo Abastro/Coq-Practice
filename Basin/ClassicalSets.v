@@ -106,7 +106,7 @@ Notation "'{|' x '|}'" := (Singleton x) (at level 0).
 Notation "'{|' x , .. , y , z '|}'" :=
   (Union (Singleton x) .. (Union (Singleton y) (Singleton z)) ..)
   (at level 0, no associativity).
-Notation "A '//\\' B" := (Intersect A B) (at level 60, right associativity).
+Notation "A '//\\' B" := (Intersect A B) (at level 55, right associativity).
 Notation "A '\\//' B" := (Union A B) (at level 60, right associativity).
 Notation "'~!' A" := (Complement A) (at level 20).
 Notation "A '\\' B" := (Setminus A B) (at level 65, left associativity).
@@ -175,7 +175,7 @@ Proof. firstorder. Qed.
 Lemma inc_full: forall (A: ESet U), A <:= FullSet.
 Proof. firstorder. Qed.
 
-(* Union, Intersection (TODO: Interaction btwn union & intersection) *)
+(* Union, Intersection *)
 
 Lemma union_comm: forall B C: ESet U, B \\// C == C \\// B.
 Proof. firstorder. Qed.
@@ -215,6 +215,15 @@ Proof. firstorder. Qed.
 
 Lemma union_inc_distr: forall A B C D: ESet U,
   A <:= B -> C <:= D -> A \\// C <:= B \\// D.
+Proof. firstorder. Qed.
+
+(* Interaction btwn union and intersection *)
+Property union_intersect_distr: forall A B C: ESet U,
+  C \\// (A //\\ B) == (C \\// A) //\\ (C \\// B).
+Proof. firstorder. Qed.
+
+Property intersect_union_distr: forall A B C: ESet U,
+  C //\\ (A \\// B) == (C //\\ A) \\// (C //\\ B).
 Proof. firstorder. Qed.
 
 
@@ -260,6 +269,7 @@ Hint Resolve
   union_comm union_assoc intersect_comm intersect_assoc
   union_inc union_inc2 intersect_inc intersect_inc2
   union_inc_distr intersect_inc_distr
+  union_intersect_distr intersect_union_distr
   full_compl empty_compl
   union_compl intersect_compl compl_compl
   setminus_as_intersect singleton_def: sets.
@@ -795,11 +805,31 @@ Lemma intersects_exch: forall U I J (A: ESet I) (B: ESet J)
 Proof. split; apply intersects_exch_. Qed.
 
 
+(* Obvious distribution lemmas *)
+Lemma intersect_distr_intersects: forall U I (A: ESet U) (K: ESet I) (P: I -> ESet U),
+  Inhabited K -> A //\\ (intersects i in K, P i) == (intersects i in K, (A //\\ P i)).
+Proof. intros * [y] x.
+  rewrite intersect_iff, 2 intersectover_iff. firstorder. Qed.
+
+Lemma union_distr_unions: forall U I (A: ESet U) (K: ESet I) (P: I -> ESet U),
+  Inhabited K -> A \\// (unions i in K, P i) == (unions i in K, A \\// P i).
+Proof. intros * [y] x.
+  rewrite union_iff, 2 unionover_iff. firstorder. Qed.
+
+
+(* Less obvious distribution lemmas *)
 Lemma intersect_distr_unions: forall U I (A: ESet U) (K: ESet I) (P: I -> ESet U),
   A //\\ (unions i in K, P i) == (unions i in K, (A //\\ P i)).
 Proof. intros * x.
-  rewrite intersect_iff. rewrite 2 unionover_iff. firstorder. Qed.
+  rewrite intersect_iff, 2 unionover_iff. firstorder. Qed.
 
+(* Requires LEM *)
+Lemma union_distr_intersects: forall U I (A: ESet U) (K: ESet I) (P: I -> ESet U),
+  A \\// (intersects i in K, P i) == intersects i in K, (A \\// P i).
+Proof. intros * x.
+  rewrite union_iff. rewrite 2 intersectover_iff.
+  decides (x :in: A); firstorder.
+Qed.
 
 
 (* #[export]
