@@ -2,19 +2,24 @@
 (*                   Mainly classical Base module                    *)
 (* ----------------------------------------------------------------- *)
 
-Require Export Basics.
-Require Export Setoid.
-Require Export SetoidClass.
-Require Export RelationClasses.
+From Coq Require Export Basics.
+From Coq Require Export Setoid SetoidClass RelationClasses.
 
-Require Export PeanoNat.
-Require Export Lia.
+(* Uses SSReflect *)
+From Coq Require Export ssreflect ssrfun ssrbool.
 
-Require Import List.
+From Coq Require Export PeanoNat.
+From Coq Require Export Lia.
+
+From Coq Require Import List.
 Import ListNotations.
 
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 Generalizable All Variables.
+
 
 (* Rewrite tactics *)
 (* Setoid_rewrites all occurrences, until it meets True. Renames hypothesis. *)
@@ -32,6 +37,7 @@ Ltac all_rewrite := let BLOCK := True in
 
 (* Rewrites all occurrences to match for reflexivity. *)
 Ltac rw_refl := all_rewrite; reflexivity.
+
 
 Property setoid_refl `(Setoid U): forall x, x == x.
 Proof. reflexivity. Qed.
@@ -79,8 +85,11 @@ Definition getPr `(pf: {x: U | P x}): P (get pf) :=
 Property sig_eq_iff: forall U P (x y: { t: U | P t }),
   x = y <-> get x = get y.
 Proof. split.
-  - intros ->. reflexivity.
-  - destruct x, y; simpl. intros ->. f_equal. apply proof_irrelevance. Qed.
+  - move=> ->. reflexivity.
+  - elim: x y => [xi xp] [yi yp]. simpl.
+    move: xp yp => + + E. rewrite E => xp yp.
+    f_equal. apply: proof_irrelevance.
+Qed.
 
 
 (* Function type - considered normal setoid *)
@@ -112,16 +121,18 @@ Definition bijective `(f: U -> V): Prop :=
 
 Lemma bi_unique_inv: forall `(f: U -> V) (y: V),
   bijective f -> exists ! x, y = f x.
-Proof. intros * [I S].
-  specialize (S y) as [x ->]. exists x. split; auto. Qed.
+Proof.
+  move=> U V f y [I S]. elim: (S y) => [x ->].
+  exists x. split; auto. Qed.
 
 Lemma left_inv_then_inj: forall `(f: U -> V) (g: V -> U),
   (forall x, g (f x) = x) -> injective f.
-Proof. intros ** x x' E. rewrite <- (H x), <- (H x'). f_equal. trivial. Qed.
+Proof. move=> > H x x' E. move: (H x) (H x') => <- <-.
+  by f_equal. Qed.
 
 Lemma right_inv_then_surj: forall `(f: U -> V) (g: V -> U),
   (forall y, f (g y) = y) -> surjective f.
-Proof. intros ** y. exists (g y). easy. Qed.
+Proof. move=> ? ? f g H y. by exists (g y). Qed.
 
 
 (* Aid on unique existence *)
@@ -130,39 +141,22 @@ Lemma unique_by_uniqueness: forall U (P: U -> Prop) u,
 Proof. firstorder. Qed.
 
 
-(*
-  Not used
-Fixpoint generalize_all (l: Tlist) (x: T): arrows l T :=
-  match l with
-  | Tnil => x
-  | Tcons A tl => fun a => generalize_all tl x
-  end.
+(* Additional lemmas on list *)
+Lemma list_may_nil: forall A (l: list A), { l = [] } + { l <> [] }.
+Proof. move=> A. case=> [|a l']; by [left | right]. Qed.
 
-Fixpoint pointwise_ext {S T} (f: S -> T) (l: Tlist):
-  arrows l S -> arrows l T :=
-  match l with
-  | Tnil => fun a => f a
-  | Tcons A tl => fun a => fun x => pointwise_ext f tl (a x)
-  end.
+Lemma last_nth: forall A d (l: list A), last l d = nth (Nat.pred (length l)) l d.
+Proof. move=> A d. elim=> [| a l'] //. case: l' => //. Qed.
 
-Fixpoint pointwise_ext2 {S T U} (op: S -> T -> U) (l: Tlist):
-  arrows l S -> arrows l T -> arrows l U :=
-  match l with
-  | Tnil => fun a b => op a b
-  | Tcons A tl => fun a b => fun x => pointwise_ext2 op tl (a x) (b x)
-  end.
-
-
-Notation "'[:' U , .. , V ':]'" := (Tcons U .. (Tcons V Tnil) ..)
-  (at level 0, no associativity): type_scope.
-
-
-#[export]
-Hint Unfold generalize_all pointwise_ext pointwise_ext2: core.
-*)
+Lemma last_in: forall A d (l: list A), l <> [] -> In (last l d) l.
+Proof.
+  move=> A d [|a l'] _ //.
+  rewrite last_nth. apply/nth_In => /=. lia.
+Qed.
 
 
 (* The following are equivalent *)
+
 Definition TFAE (l: list Prop) : Prop :=
   forall n m : nat, nth n l False -> nth m l True.
 
@@ -172,29 +166,31 @@ Fixpoint chain_impl (P: Prop) (l: list Prop): Prop :=
   | _ => True
   end.
 
+
 Lemma tfae_by_chain: forall P (l: list Prop),
   chain_impl P l ->
-  (nth (pred (length l)) l False -> P) -> TFAE (P :: l).
+  (last l False -> P) ->
+  TFAE (P :: l).
 Proof.
-  intros *. generalize dependent P.
-  induction l as [| Q l'].
-  - intros ? _ _ n m. destruct n. destruct m. trivial.
-    + simpl. destruct m; trivial.
-    + simpl. destruct n; contradiction.
-  - intros ? [HF HC] HL n m.
-    assert (IH: TFAE (Q :: l')). {
-      apply IHl'. apply HC. simpl in HL.
-      destruct l'; firstorder.
+  move=> + l. elim: l => [|Q l' IH].
+  - move=> P _ _. case=> [|n'] [|m'] //=.
+    all: by [case: m' | case: n'].
+  - move=> P [HF HC] HL.
+    have {HC} IH: TFAE(Q :: l'). {
+      apply: {IH HC} (IH _ HC).
+      case: l' HL; firstorder.
     }
-    destruct n, m; trivial.
-    + intros H0%HF. apply (IH 0 m). trivial.
-    + intros H0%(IH n (length l')). apply HL.
-      rewrite nth_indep with (d' := True). trivial. auto.
-    + apply IH.
+    case=> [|n'] [|m'] //.
+    + move/HF => H. by apply: (IH 0 m').
+    + move=> H. apply: HL.
+      rewrite last_nth (nth_indep _ _ True) => //.
+      by apply: (IH n' (length l')).
+    + apply: (IH n' m').
 Qed.
 
+
 Ltac tfae_chain := apply tfae_by_chain;
-  unfold chain_impl, nth, length, pred; repeat apply conj; trivial.
+  unfold chain_impl, nth, length, Nat.pred; repeat apply conj; trivial.
 
 Lemma tfae_then_any: forall (n m: nat) (l: list Prop),
   TFAE l -> nth n l False -> nth m l True.

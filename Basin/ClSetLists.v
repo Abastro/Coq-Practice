@@ -1,27 +1,68 @@
+(* ----------------------------------------------------------------- *)
+(*                     Basic algebra of Sets                         *)
+(* ----------------------------------------------------------------- *)
+
 From Practice Require Import Basin.Base.
+From Practice Require Import Basin.ElemAlg.
 From Practice Require Import Basin.ClassicalSets.
 
-Require Import List.
+Import List.
 Import ListNotations.
 
-(* Forall & Exists over list as decidable proposition *)
-(* Instance decp1_forall_list {U} (P: U -> Prop) `(DecPred1 U P): DecP1 (Forall P).
-Proof with (auto with datatypes).
-  intros l. induction l.
-  - left...
-  - destruct (H a), IHl;
-    [left | right | right | right]...
-    all: now inversion 1.
-Qed.
 
-Instance decp1_exists_list {U} (P: U -> Prop)  `(DecPred1 U P): DecP1 (Exists P).
-Proof with (auto with datatypes).
-  intros l. induction l.
-  - right. now inversion 1.
-  - destruct (H a), IHl;
-    [left | left | left | right]...
-    now inversion 1.
-Qed. *)
+(* Union: CommMonoid *)
+Program Instance magma_union U: Magma _ (@Union U).
+
+Program Instance assoc_union U: Associative _ (@Union U).
+Next Obligation. firstorder. Qed.
+
+Program Instance comm_union U: Commutative _ (@Union U).
+Next Obligation. firstorder. Qed.
+
+Program Instance hasid_union U: HasIdentity _ (@Union U) := { mid := EmptySet }.
+Next Obligation. firstorder. Qed.
+Next Obligation. firstorder. Qed.
+
+Program Instance semigroup_union U: Semigroup _ (@Union U).
+Program Instance monoid_union U: Monoid _ (@Union U).
+Program Instance cmon_union U: CommMonoid _ (@Union U).
+
+
+Program Instance magma_intersect U: Magma _ (@Intersect U).
+
+Program Instance assoc_intersect U: Associative _ (@Intersect U).
+Next Obligation. firstorder. Qed.
+
+Program Instance comm_intersect U: Commutative _ (@Intersect U).
+Next Obligation. firstorder. Qed.
+
+Program Instance hasid_intersect U: HasIdentity _ (@Intersect U) := { mid := FullSet }.
+Next Obligation. firstorder. Qed.
+Next Obligation. firstorder. Qed.
+
+Program Instance semigroup_intersect U: Semigroup _ (@Intersect U).
+Program Instance monoid_intersect U: Monoid _ (@Intersect U).
+Program Instance cmon_intersect U: CommMonoid _ (@Intersect U).
+
+
+Lemma cat_unions_as_unionover: forall U (L: list (ESet U)),
+  MCat Union L == MCatOver Union id L.
+Proof. move=> U L. by rewrite /MCatOver map_id. Qed.
+
+Lemma cat_intersects_as_intersectover: forall U (L: list (ESet U)),
+  MCat Intersect L == MCatOver Intersect id L.
+Proof. move=> U L. by rewrite /MCatOver map_id. Qed.
+
+
+Lemma cat_unionover_compl: forall I U (L: list I) (F: I -> ESet U),
+  ~! (MCatOver Union F L) == MCatOver Intersect (fun i => ~! F i) L.
+Proof. move=> I U L F. elim: L; firstorder. Qed.
+
+Lemma cat_intersectover_compl: forall I U (L: list I) (F: I -> ESet U),
+  ~! (MCatOver Intersect F L) == MCatOver Union (fun i => ~! F i) L.
+Proof. move=> I U L F. elim: L => [|a L IH]. firstorder.
+  constructor=> x. decides (x :in: F a); firstorder. Qed.
+
 
 (* Set of lists where each element is in a set *)
 Definition ForallSet {U} (T: ESet U): ESet (list U) :=
@@ -30,38 +71,3 @@ Definition ForallSet {U} (T: ESet U): ESet (list U) :=
 (* Set of lists where at least single element is in a set *)
 Definition ExistsSet {U} (T: ESet U): ESet (list U) :=
   mkSet (fun L => Exists (InSet T) L).
-
-
-(* Union/Intersection over list *)
-Fixpoint UnionList {U} (l: list (ESet U)): ESet U :=
-  match l with
-  | nil => EmptySet
-  | A :: l' => A \\// UnionList l'
-  end.
-
-Fixpoint IntersectList {U} (l: list (ESet U)): ESet U :=
-  match l with
-  | nil => FullSet
-  | A :: l' => A //\\ IntersectList l'
-  end.
-
-Lemma UnionList_couple: forall U (A B: ESet U),
-  UnionList [A; B] == A \\// B.
-Proof. intros. unfold UnionList. firstorder. Qed.
-
-Lemma IntersectList_couple: forall U (A B: ESet U),
-  IntersectList [A; B] == A //\\ B.
-Proof. intros. unfold IntersectList. firstorder. Qed.
-
-Lemma UnionList_app: forall U (L1 L2: list (ESet U)),
-  UnionList (L1 ++ L2) == UnionList L1 \\// UnionList L2.
-Proof. intros. induction L1; firstorder. Qed.
-
-Lemma IntersectList_app: forall U (L1 L2: list (ESet U)),
-  IntersectList (L1 ++ L2) == IntersectList L1 //\\ IntersectList L2.
-Proof. intros. induction L1; firstorder. Qed.
-
-#[export]
-Hint Unfold UnionList IntersectList: sets.
-#[export]
-Hint Resolve UnionList_app IntersectList_app: sets.

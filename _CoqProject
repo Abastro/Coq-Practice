@@ -1,7 +1,10 @@
 -R . Practice
 
 Basin/Base.v
+Basin/ElemAlg.v
+
 Basin/ClassicalSets.v
 Basin/ClSetLists.v
+
 Basin/Topology.v
 Basin/Sups.v
