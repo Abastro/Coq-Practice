@@ -92,7 +92,7 @@ Proof. split.
 Qed.
 
 
-(* Function type - considered normal setoid *)
+(* Function type considered normal setoid *)
 
 Program Instance setoid_function U `(Setoid V): Setoid (U -> V) := {
   equiv := fun f g => forall u, f u == g u }.
@@ -139,6 +139,17 @@ Proof. move=> ? ? f g H y. by exists (g y). Qed.
 Lemma unique_by_uniqueness: forall U (P: U -> Prop) u,
   P u -> uniqueness P -> unique P u.
 Proof. firstorder. Qed.
+
+
+
+(* ----------------------------------------------------------------- *)
+(*                          More on Logics                           *)
+(* ----------------------------------------------------------------- *)
+
+Lemma is_true_fold: forall p: bool, (p = true) = p.
+Proof. reflexivity. Qed.
+
+Instance trans_gt : Transitive gt := flip_Transitive _.
 
 
 (* Additional lemmas on list *)
