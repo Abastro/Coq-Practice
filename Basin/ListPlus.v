@@ -5,43 +5,13 @@
 From Practice Require Import Basin.Base.
 From Coq Require Export Sorting.
 
-Import List.
-Import ListNotations.
 
 Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
+(* TODO Drop this *)
 
-(* ----------------------------------------------------------------- *)
-(*                 Lemmas regarding Forall & forallb                 *)
-(* ----------------------------------------------------------------- *)
-
-Lemma Forall_single: forall T P (a: T), Forall P [a] <-> P a.
-Proof. move=> T P a. rewrite Forall_forall. by firstorder; subst. Qed.
-
-
-Section forallb.
-Variable T: Type.
-Variable f: T -> bool.
-
-Property ForallP: forall l,
-  reflect (Forall f l) (forallb f l).
-Proof. move=> l.
-  apply: Bool.iff_reflect. rewrite forallb_forall Forall_forall //. Qed.
-
-End forallb.
-
-Add Parametric Morphism U: (@Forall U)
-  with signature equiv ==> eq ==> iff as Forall_mor.
-Proof.
-  move=> P Q E. do 2 red in E. elim=> // a l' IH. split=> H.
-  all: move: (Forall_inv H) (Forall_inv_tail H).
-  all: rewrite IH E || rewrite -IH -E. all: apply: Forall_cons.
-Qed.
-
-
+(*
 (* ----------------------------------------------------------------- *)
 (*               Lemmas and boolean version of Forall2               *)
 (* ----------------------------------------------------------------- *)
@@ -84,6 +54,11 @@ Proof. move=> x y l m H. inversion H; subst=> //. Qed.
 Lemma Forall2_single: forall x y,
   Forall2 R [x] [y] <-> R x y.
 Proof. move=> x y. split=> H. apply: Forall2_inv; eauto. by constructor. Qed.
+
+Lemma Forall2_len: forall l m,
+  Forall2 R l m -> length l = length m.
+Proof. move=> l m. elim=> //= x y l' m' _ _. lia. Qed.
+
 
 
 Lemma Forall2_nth l m:
@@ -488,3 +463,5 @@ Proof.
 Qed.
 
 End NatB.
+
+*)

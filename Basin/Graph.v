@@ -2,18 +2,62 @@
 (*                       Simple finite Graphs                        *)
 (* ----------------------------------------------------------------- *)
 
-From Practice Require Import Basin.Base.
-From Practice Require Import Basin.ListPlus.
-
-Import List.
-Import ListNotations.
+From Practice Require Import Base.
+From mathcomp Require Export fintype path fingraph finfun.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 
+(* Graph is denoted as {ffun T -> seq T} *)
+
+(* Graph Relations *)
+Section Image.
+Variable T S: finType.
+Variable f: T -> S.
+
+Definition graphim (g: {ffun T -> seq T}) :=
+  [ffun y =>
+    map f (flatten [seq g x | x in preim f (pred1 y)])
+  ].
+
+(*
+Definition relim (r: rel T) :=
+  [ rel a' b' |
+    [ exists a in preim f (pred1 a'),
+      exists b in preim f (pred1 b'),
+      r a b ] ]
+.
+
+Lemma pred1_exists: forall p (a: T), [exists a' in pred1 a, p a'] = p a.
+Proof.
+  move=> p a. apply/existsP/idP.
+  - move=> [a' /andP [/eqP ->]] //.
+  - move=> ?. exists a. apply/andP. split=> //. by apply/eqP.
+Qed.
+
+Lemma preim_pred1: injective f -> forall a, preim f (pred1 (f a)) =i pred1 a.
+Proof. move=> Hf a a' /=. by apply: inj_eq. Qed.
+
+Property relim_relpre: injective f -> forall r, relpre f (relim r) =2 r.
+Proof.
+  move=> Hf r a b /=.
+  under eq_existsb=> a'. rewrite preim_pred1 //.
+    under eq_existsb=> b'. rewrite preim_pred1 //.
+      over.
+    rewrite pred1_exists. over.
+  rewrite pred1_exists. done.
+Qed.
+*)
+
+End Image.
+
+
+
+
+
+(*
 (* Directed graph represented with Nat *)
 Module DGraph <: Equalities.Typ.
 
@@ -69,8 +113,14 @@ Proof.
 Qed.
 
 
-Definition shift (k: nat) (G: t) :=
-  map (map (plus k)) G.
+(* Embedding into larger graph *)
+Inductive IsEmbed: list nat -> t -> t -> Prop :=
+  | embed_empty: IsEmbed [] [] K
+  | embed_cons: forall n inc, IsEmbed (n :: inc) (e :: G) (K)
+.
+
+hasEdge K s t -> rth inc m d = s  rth inc n d' = t
+hasEdge G m n <-> hasEdge K (rth inc m d) (rth inc n d')
 
 End DGraph.
 
@@ -124,12 +174,16 @@ Qed.
   DAG Extension.
   (N :: tar) should be in decreasing order, with length tar = length G.
 *)
+(*
 Fixpoint extend (N: nat) (tar: list nat) (G: t): t :=
   match tar, G with
   | n :: tar', e :: G' =>
     repeat [] (N - S n) ++ map (fun m => rth m tar 0) e :: extend n tar' G'
   | _, _ => repeat [] N
   end.
+*)
+
+
 
 Local Example ex_extend: extend 6 [4; 3; 1] [[1]; [0]; []] = [[]; [3]; [1]; []; []; []].
 Proof. reflexivity. Qed.
@@ -272,3 +326,5 @@ Proof.
 Qed.
 
 End DAG.
+
+*)

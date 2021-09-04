@@ -3,14 +3,13 @@
 (* ----------------------------------------------------------------- *)
 
 From Practice Require Import Basin.Base.
-Import List.
-Import ListNotations.
 Require Import Permutation.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
+
 
 (* ----------------------------------------------------------------- *)
 (*                       Equivalence on list                         *)

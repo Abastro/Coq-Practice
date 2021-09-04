@@ -2,25 +2,16 @@
 (*                   Mainly classical Base module                    *)
 (* ----------------------------------------------------------------- *)
 
-From Coq Require Export Basics.
-From Coq Require Export Setoid SetoidClass RelationClasses.
+From Coq Require Export RelationClasses.
 
-(* Uses SSReflect *)
-From Coq Require Export ssreflect ssrfun ssrbool.
-
-From Coq Require Export PeanoNat.
-From Coq Require Export Lia.
-
-From Coq Require Import List.
-Import ListNotations.
-
+From mathcomp Require Export ssreflect ssrfun ssrbool.
+From mathcomp Require Export eqtype ssrnat seq.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-
+(*
 (* Rewrite tactics *)
 (* Setoid_rewrites all occurrences, until it meets True. Renames hypothesis. *)
 Ltac all_rewrite := let BLOCK := True in
@@ -73,7 +64,7 @@ Property usualeq_spec: forall `(UsualSetoid U) (x y: U), (x == y) = (x = y).
 Proof. reflexivity. Qed.
 
 
-(* Sig type *)
+(* Sig type - TODO: Migrate to ssreflect *)
 
 Definition mkSig `(x: U) {P: U -> Prop} (pf: P x): {x | P x} :=
   exist P x pf.
@@ -86,7 +77,7 @@ Property sig_eq_iff: forall U P (x y: { t: U | P t }),
   x = y <-> get x = get y.
 Proof. split.
   - move=> ->. reflexivity.
-  - elim: x y => [xi xp] [yi yp]. simpl.
+  - case: x y=> [xi xp] [yi yp]. simpl.
     move: xp yp => + + E. rewrite E => xp yp.
     f_equal. apply: proof_irrelevance.
 Qed.
@@ -108,33 +99,6 @@ Hint Unfold setoid_usual setoid_function: core.
 Hint Resolve usualeq_spec sig_eq_iff: core.
 
 
-(* Injective & Surjective *)
-Definition injective `(f: U -> V): Prop :=
-  forall x x': U, f x = f x' -> x = x'.
-
-Definition surjective `(f: U -> V): Prop :=
-  forall y: V, exists x: U, y = f x.
-
-Definition bijective `(f: U -> V): Prop :=
-  injective f /\ surjective f.
-
-
-Lemma bi_unique_inv: forall `(f: U -> V) (y: V),
-  bijective f -> exists ! x, y = f x.
-Proof.
-  move=> U V f y [I S]. elim: (S y) => [x ->].
-  exists x. split; auto. Qed.
-
-Lemma left_inv_then_inj: forall `(f: U -> V) (g: V -> U),
-  (forall x, g (f x) = x) -> injective f.
-Proof. move=> > H x x' E. move: (H x) (H x') => <- <-.
-  by f_equal. Qed.
-
-Lemma right_inv_then_surj: forall `(f: U -> V) (g: V -> U),
-  (forall y, f (g y) = y) -> surjective f.
-Proof. move=> ? ? f g H y. by exists (g y). Qed.
-
-
 (* Aid on unique existence *)
 Lemma unique_by_uniqueness: forall U (P: U -> Prop) u,
   P u -> uniqueness P -> unique P u.
@@ -152,24 +116,11 @@ Proof. reflexivity. Qed.
 Instance trans_gt : Transitive gt := flip_Transitive _.
 
 
-(* Additional lemmas on list *)
-Lemma list_may_nil: forall A (l: list A), { l = [] } + { l <> [] }.
-Proof. move=> A. case=> [|a l']; by [left | right]. Qed.
-
-Lemma last_nth: forall A d (l: list A), last l d = nth (Nat.pred (length l)) l d.
-Proof. move=> A d. elim=> [| a l'] //. case: l' => //. Qed.
-
-Lemma last_in: forall A d (l: list A), l <> [] -> In (last l d) l.
-Proof.
-  move=> A d [|a l'] _ //.
-  rewrite last_nth. apply/nth_In => /=. lia.
-Qed.
-
 
 (* The following are equivalent *)
 
 Definition TFAE (l: list Prop) : Prop :=
-  forall n m : nat, nth n l False -> nth m l True.
+  forall n m : nat, nth False l n -> nth True l m.
 
 Fixpoint chain_impl (P: Prop) (l: list Prop): Prop :=
   match l with
@@ -180,22 +131,21 @@ Fixpoint chain_impl (P: Prop) (l: list Prop): Prop :=
 
 Lemma tfae_by_chain: forall P (l: list Prop),
   chain_impl P l ->
-  (last l False -> P) ->
+  (last False l -> P) ->
   TFAE (P :: l).
 Proof.
-  move=> + l. elim: l => [|Q l' IH].
-  - move=> P _ _. case=> [|n'] [|m'] //=.
-    all: by [case: m' | case: n'].
-  - move=> P [HF HC] HL.
+  move=> + l. elim: l=> [|Q l' IH].
+  - move=> P _ _ n m.
+    do !(case: n=> [|n] //=).
+    do !(case: m=> [|m] //=).
+  - move=> /= P [HF HC] HL.
     have {HC} IH: TFAE(Q :: l'). {
       apply: {IH HC} (IH _ HC).
       case: l' HL; firstorder.
     }
-    case=> [|n'] [|m'] //.
+    case=> [|n'] [|m'] //=.
     + move/HF => H. by apply: (IH 0 m').
-    + move=> H. apply: HL.
-      rewrite last_nth (nth_indep _ _ True) => //.
-      by apply: (IH n' (length l')).
+    + move/(IH n' (size l')). rewrite nth_last //.
     + apply: (IH n' m').
 Qed.
 
@@ -204,6 +154,7 @@ Ltac tfae_chain := apply tfae_by_chain;
   unfold chain_impl, nth, length, Nat.pred; repeat apply conj; trivial.
 
 Lemma tfae_then_any: forall (n m: nat) (l: list Prop),
-  TFAE l -> nth n l False -> nth m l True.
+  TFAE l -> nth False l n -> nth True l m.
 Proof. firstorder. Qed.
 
+*)
