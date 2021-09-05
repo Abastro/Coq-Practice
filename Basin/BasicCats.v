@@ -22,6 +22,7 @@ Generalizable All Variables.
 Module Type HasSCat (Import T: Equalities.Typ).
 Parameter R: t -> t -> Prop.
 Axiom PO: PreOrder R.
+Existing Instance PO.
 End HasSCat.
 Module Type SCat := Equalities.Typ <+ HasSCat.
 
@@ -32,15 +33,14 @@ Definition U := M.t.
 
 Section Env1.
 Variable T: finType.
-Variable V: T -> U.
+Variable V: {ffun T -> U}.
 
-Definition hold (r: rel T) :=
-  forall m n, r m n -> R (V m) (V n).
+Definition hold (r: fnrel T) :=
+  forall a b, r a b -> R (V a) (V b).
 
-Lemma hold_trans: forall r, hold r -> hold (connect r).
+Lemma hold_trans: forall r, hold r -> hold (fnconnect r).
 Proof.
-  have PO := PO.
-  move=> r H x y. move/connectP=> [p + ->].
+  move=> r H x y. move/fnconnectP=> [p + ->].
   elim: p x=> [| z p' IH] /= x.
   - reflexivity.
   - move/andP=> [Hr /IH]. apply: transitivity. by apply /H.
@@ -48,25 +48,78 @@ Qed.
 
 End Env1.
 
+
 Section Env2.
 Variable T S: finType.
-Variable W: S -> U.
-Variable f: T -> S.
+Variable W: {ffun S -> U}.
+Variable f: {ffun T -> S}.
 
-Lemma hold_embed: forall r, hold (W \o f) r -> hold W (relim f r).
+Lemma hold_embed r: hold (finfun (W \o f)) r -> hold W (fnrelim f r).
 Proof.
-  move=> r H a' b' /=.
+  move=> H a' b' /=. rewrite fnrelE.
   move=> /existsP [a /andP [Ha]].
   move=> /existsP [b /andP [Hb]].
   move: Ha Hb. rewrite /in_mem /=.
   move/eqP <-. move/eqP <-.
-  by move/H.
+  move/H. by rewrite !ffunE.
 Qed.
 
-Lemma hold_preim: forall r, hold W r -> hold (W \o f) (relpre f r).
-Proof. move=> r H a b /=. by move/H. Qed.
+Lemma hold_embed_eq r V:
+  V = finfun (W \o f) -> hold V r -> hold W (fnrelim f r).
+Proof. move ->. apply/hold_embed. Qed.
+
+Lemma hold_preim: forall r, hold W r -> hold (finfun (W \o f)) (fnrelpre f r).
+Proof. move=> r H a b /=. rewrite fnrelE !ffunE. by move/H. Qed.
 
 End Env2.
+
+(* Find a map f where V = finfun (W \o f) *)
+(* Ltac findMap V W :=
+  match type of V with {ffun ?S -> U} =>
+    match type of W with {ffun ?T -> U} =>
+      (* Find element b of l where W b = u *)
+      let rec find u l :=
+        match l with
+        | ?b :: ?l' => match Compute (W b) with
+        end
+      in
+      move: (enum S)
+    end
+  end. *)
+
+
+(* Using ordinals to construct finite mapping / relation *)
+Section WithOrd.
+Variable n: nat.
+
+Definition tupMap A (t: n.-tuple A): {ffun 'I_n -> A} :=
+  [ffun i => tnth t i].
+
+Definition seqRel (t: seq (nat * nat)): fnrel (ordinal_finType n) :=
+  finrel [rel i j | (nat_of_ord i, nat_of_ord j) \in t].
+
+End WithOrd.
+
+
+Local Example ex_hold_move: forall (a b c d: U),
+  hold (tupMap [tuple a; b; c]) (seqRel _ [:: (0, 1); (1, 2)]) ->
+  hold (tupMap [tuple a; c; b; d]) (seqRel _ [:: (0, 1); (2, 1)]).
+Proof.
+  move=> a b c d.
+  Compute (tupMap [tuple 0; 1; 2] == tupMap [tuple 0; 1; 2]).
+  (* Compute ([tnth [tuple a; b; c] 0]). *)
+  (* findMap (tupMap [tuple a; b; c]) (tupMap [tuple a; c; b; d]). *)
+
+  move /hold_trans.
+  move /(hold_embed_eq
+    (W := tupMap [tuple a; c; b; d])
+    (f := tupMap [tuple inord 0; inord 2; inord 1])).
+  move /(_ erefl).
+  
+  simpl.
+  apply.
+Qed.
+
 
 (*
 PROBLEM: Relation cannot be evaluated!
