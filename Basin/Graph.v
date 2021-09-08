@@ -1,126 +1,194 @@
 (* ----------------------------------------------------------------- *)
-(*                            Finite Graphs                          *)
+(*                      Evaluable Finite Graphs                      *)
 (* ----------------------------------------------------------------- *)
 
 From Practice Require Import Base.
-From mathcomp Require Export fintype path fingraph finfun.
+From mathcomp Require Export fintype path fingraph tuple.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Generalizable All Variables.
 
 
-(* Finite version of relation - construct with finrel. *)
+(* Computable definition of ord_tuple *)
 
-Section FinRel.
-Variable T: finType.
+Definition compIdP (b: bool): reflect b b :=
+  if b
+  then ReflectT true is_true_true
+  else ReflectF false not_false_is_true.
+Arguments compIdP {b}.
 
-Variant fnrel :=
-  Finrel of {ffun T -> {ffun T -> bool}}.
+Section SubType.
 
-Local Definition finrel_def (r: rel T): fnrel :=
-  Finrel [ffun x => finfun (r x)].
+Variable T: Type.
+Variable P: pred T.
+Variable sT: subType P.
 
-Definition rel_of_fin (r: fnrel): rel T :=
-  let: Finrel r' := r in [rel a b | r' a b].
-Coercion rel_of_fin: fnrel >-> rel.
+Definition sembed x :=
+  if compIdP is ReflectT Px then Some (Sub (sT := sT) x Px) else None.
 
-End FinRel.
-
-
-(* Opaque definition *)
-Module Type FinrelDefSig.
-Parameter finrel : forall (T: finType), rel T -> fnrel T.
-Axiom finrelE : finrel = finrel_def.
-End FinrelDefSig.
-
-Module FinrelDef : FinrelDefSig.
-Definition finrel := finrel_def.
-Lemma finrelE : finrel = finrel_def. reflexivity. Qed.
-End FinrelDef.
-
-Notation finrel := FinrelDef.finrel.
-Canonical finrel_unlock := Unlockable FinrelDef.finrelE.
-
-
-Section FinRel.
-Variable T: finType.
-
-Property fnrelE (r: rel T) a b: (finrel r) a b = r a b.
-Proof. rewrite unlock /= !ffunE //. Qed.
-
-Property fnrelP (r1 r2: fnrel T): (forall a b, r1 a b = r2 a b) <-> r1 = r2.
+Property sembedP x: insub_spec x (sembed x).
 Proof.
-  move: r1 r2=> [r1] [r2]. transitivity (r1 = r2).
-  rewrite -ffunP /=. split=> H a; by apply/ffunP.
-  split. by move ->. by move=> [].
+  rewrite /sembed.
+  case: {-}_ /compIdP; by [left; rewrite ?SubK | right; apply/negP].
 Qed.
 
-Property fnrelK: cancel (@rel_of_fin T) (@finrel T).
-Proof. rewrite /cancel=> r. apply /fnrelP /fnrelE. Qed.
+Property sembed_insub: sembed =1 insub.
+Proof.
+  move=> x. case: sembedP=> [/SubP[y Py] _ <- | /negPf nPx].
+  rewrite SubK insubT //. rewrite insubF //.
+Qed.
 
-End FinRel.
+End SubType.
+
+Arguments sembed {T P sT} x.
+
+
+Definition enumOrd n: seq (ordinal n) := pmap sembed (iota 0 n).
+
+Property enumOrd_enum n: enumOrd n = enum 'I_n.
+Proof. rewrite enumT unlock /= /enumOrd /ord_enum. apply/eq_pmap /sembed_insub. Qed.
+
+Lemma filter_enumOrd_enum n (A: {pred 'I_n}): filter A (enumOrd n) = enum A.
+Proof. rewrite enumOrd_enum enumT //. Qed.
+
+
+
+Program Definition tupleOrd n: (n.-tuple 'I_n) := @Tuple _ _ (enumOrd n) _.
+Next Obligation. rewrite enumOrd_enum. apply/eqP/size_enum_ord. Qed.
+
+Property tupleOrd_ord_tuple n: tupleOrd n = ord_tuple n.
+Proof. apply /val_inj. simpl. apply/enumOrd_enum. Qed.
+
+
+Definition tupleOf `(f: 'I_n -> T) := map_tuple f (tupleOrd n).
+
+Property tupleOf_mktuple `(f: 'I_n -> T): tupleOf f = mktuple f.
+Proof. apply /val_inj. rewrite /= enumOrd_enum //. Qed.
+
+Property tupleOf_tnth `(f: 'I_n -> T): tnth (tupleOf f) =1 f.
+Proof. move=> i. rewrite tupleOf_mktuple tnth_mktuple //. Qed.
+
+Notation "n '.-ord' i" := (Ordinal (n:=n) (m:=i) is_true_true) (at level 10).
+
+
+Lemma tnth_zip `(t: n.-tuple T) `(u: n.-tuple U) i:
+  tnth (zip_tuple t u) i = (tnth t i, tnth u i).
+Proof.
+  rewrite /tnth. move: (tnth_default (zip_tuple t u))=> [d e].
+  rewrite nth_zip ?size_tuple // -!tnth_nth //.
+Qed.
 
 
 Section Graph.
-Variable T: finType.
-Variable e: fnrel T.
+Variable n: nat.
 
-Definition fnconnect: fnrel T := finrel (connect e).
+Definition graph := n.-tuple (seq 'I_n).
 
-Property fnconnectP x y:
-  reflect (exists2 p, path e x p & y = last x p) (fnconnect x y).
-Proof. rewrite /fnconnect fnrelE. apply/connectP. Qed.
+Definition grrel (G: graph) := grel (tnth G).
+Definition relgraph (r: rel 'I_n) :=
+  tupleOf [fun i => filter (r i) (enumOrd n)].
 
-Property fnconnect_trans: transitive fnconnect.
+Property relgraph_rgraph r: relgraph r = tupleOf (rgraph r).
 Proof.
-  rewrite /fnconnect /transitive=> y x z.
-  rewrite !fnrelE. apply /connect_trans.
+  rewrite /relgraph !tupleOf_mktuple.
+  apply/eq_mktuple=> i /=. rewrite enumOrd_enum enumT //.
 Qed.
 
-Lemma fnconnect0 x: fnconnect x x.
-Proof. rewrite /fnconnect fnrelE. apply/connect0. Qed.
+Property relgraphK r: grrel (relgraph r) =2 r.
+Proof.
+  rewrite relgraph_rgraph /grrel /grel.
+  move=> i j /=. rewrite tupleOf_tnth.
+  rewrite -rgraphK //.
+Qed.
 
-Lemma fnconnect1 x y: e x y -> fnconnect x y.
-Proof. rewrite /fnconnect fnrelE. apply/connect1. Qed.
 
-(* TODO More Lemmas *)
+Definition grwf (G: graph): graph :=
+  relgraph (grrel G).
+
+
+(* Assume well-formed graph *)
+Definition grincl (G K: graph) :=
+  all [pred gk | subseq gk.1 gk.2] (zip_tuple G K).
+
+Lemma grincl_rel G K i j: grincl G K -> grrel G i j -> grrel K i j.
+Proof.
+  move=> /all_tnthP /(_ i) /=.
+  rewrite tnth_zip /=. by move/mem_subseq /(_ j).
+Qed.
+
+
+
+(* Graph addition *)
+Definition gradd (G K: graph) :=
+  grwf (map_tuple [fun gk => gk.1 ++ gk.2] (zip_tuple G K)).
+
+Property graddK G K: grrel (gradd G K) =2 [rel i j | grrel G i j || grrel K i j].
+Proof.
+  move=> i j. rewrite relgraphK /=.
+  rewrite tnth_map tnth_zip /=. apply/mem_cat.
+Qed.
+
+
+Definition transCl (G: graph): graph :=
+  tupleOf (dfs (tnth G) n [::]).
+
+Lemma transClP G x y:
+  reflect (exists2 p, path (grrel G) x p & y = last x p)
+  (grrel (transCl G) x y).
+Proof.
+  rewrite /grrel /transCl /=.
+  rewrite tupleOf_mktuple tnth_mktuple.
+  have := (@dfsP _ (tnth G) x y). by rewrite card_ord.
+Qed.
+
+Lemma transCl_trans G: transitive (grrel (transCl G)).
+Proof.
+  move=> x y z /transClP[p ep ->] /transClP[q eq ->]. apply/transClP.
+  exists (p ++ q); by [rewrite cat_path ep eq | rewrite last_cat].
+Qed.
+
+Lemma transCl_conn0 G x: grrel (transCl G) x x.
+Proof. apply/transClP. by exists [::]. Qed.
+
+Lemma transCl_conn1 G x y: grrel G x y -> grrel (transCl G) x y.
+Proof. move=> /= H. apply/transClP. exists [:: y]; rewrite /= ?H //. Qed.
 
 End Graph.
 
 
 Section Image.
-Variable T S: finType.
-Variable f: T -> S.
+Variable m n: nat.
+Variable f: 'I_m -> 'I_n.
 
-Definition fnrelpre (r: fnrel S): fnrel T :=
-  finrel (relpre f r).
+Definition graphpre (G: graph n): graph m :=
+  tupleOf (fun a => filter [preim f of tnth G (f a)] (enumOrd m)).
 
-Definition fnrelim (r: fnrel T): fnrel S :=
-  finrel [rel a' b' | [
-    exists a in preim f (pred1 a'),
-    exists b in preim f (pred1 b'),
-    r a b
-  ] ].
+Definition graphim (G: graph m): graph n :=
+  tupleOf (fun x => [seq f b |
+    a <- (filter [preim f of pred1 x] (enumOrd m)),
+    b <- tnth G a
+  ]).
 
 
 Section InjImage.
 Hypothesis If: injective f.
 
-Lemma exists_preim p x: [exists a in preim f (pred1 (f x)), p a] = p x.
-Proof.
-  apply/existsP/idP.
-  - by move=> [a /andP [/eqP /If ->]].
-  - move=> H. exists x. apply/andP; split=> //. by apply/eqP.
-Qed.
+(* TODO Later move to more general *)
+Lemma preim_pred1 a: [preim f of pred1 (f a)] =1 pred1 a.
+Proof. move=> i /=. by apply /inj_eq. Qed.
 
-Lemma fnrel_im_pre r: fnrelpre (fnrelim r) = r.
+Lemma graph_im_pre G: graphpre (graphim G) = grwf G.
 Proof.
-  rewrite /fnrelpre /=. apply/fnrelP=> a b.
-  do 2 rewrite fnrelE /=. rewrite 2!exists_preim //.
+  apply/eq_from_tnth=> a. rewrite !tupleOf_tnth.
+  apply/eq_filter=> b /=.
+  under eq_filter=> i do rewrite preim_pred1.
+  rewrite filter_enumOrd_enum enum1 /=.
+  rewrite cats0. by apply/mem_map.
 Qed.
 
 End InjImage.
 
 End Image.
+
 

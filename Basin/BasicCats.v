@@ -31,110 +31,177 @@ Module SDiag (Import M: SCat).
 
 Definition U := M.t.
 
+(* Convenient way to make a graph *)
+Definition MkGraph n (t: seq (nat * nat)): graph n :=
+  relgraph [rel i j | (nat_of_ord i, nat_of_ord j) \in t].
+
+
 Section Env1.
-Variable T: finType.
-Variable V: {ffun T -> U}.
+Variable n: nat.
+Variable V: n.-tuple U.
 
-Definition hold (r: fnrel T) :=
-  forall a b, r a b -> R (V a) (V b).
+Definition hold (G: graph n) :=
+  forall a b, (grrel G: rel _) a b -> R (tnth V a) (tnth V b).
 
-Lemma hold_trans: forall r, hold r -> hold (fnconnect r).
+Lemma hold_trans G: hold G -> hold (transCl G).
 Proof.
-  move=> r H x y. move/fnconnectP=> [p + ->].
+  move=> H x y. move/transClP=> [p + ->].
   elim: p x=> [| z p' IH] /= x.
   - reflexivity.
   - move/andP=> [Hr /IH]. apply: transitivity. by apply /H.
 Qed.
 
+Lemma hold_incl (G K: graph n): grincl G K -> hold K -> hold G.
+Proof. move/grincl_rel=> + + x y. move=> /(_ x y) + /(_ x y). firstorder. Qed.
+
+Lemma hold_add (G K: graph n): hold G -> hold K -> hold (gradd G K).
+Proof. move=> HG HK a b. rewrite graddK=> /orP [/HG|/HK] //. Qed.
+
 End Env1.
 
 
 Section Env2.
-Variable T S: finType.
-Variable W: {ffun S -> U}.
-Variable f: {ffun T -> S}.
+Variable m n: nat.
+Variable W: n.-tuple U.
+Variable f: 'I_m -> 'I_n.
 
-Lemma hold_embed r: hold (finfun (W \o f)) r -> hold W (fnrelim f r).
+Lemma hold_embed G: hold (tupleOf (tnth W \o f)) G -> hold W (graphim f G).
 Proof.
-  move=> H a' b' /=. rewrite fnrelE.
-  move=> /existsP [a /andP [Ha]].
-  move=> /existsP [b /andP [Hb]].
-  move: Ha Hb. rewrite /in_mem /=.
-  move/eqP <-. move/eqP <-.
-  move/H. by rewrite !ffunE.
+  move=> H a' b' /=.
+  rewrite tupleOf_tnth filter_enumOrd_enum.
+  move=> /flatten_mapP[a].
+  rewrite mem_enum=> /eqP <-.
+  move=> /mapP[b] Hab ->.
+  move: (H _ _ Hab). by rewrite !tupleOf_tnth.
 Qed.
 
-Lemma hold_embed_eq r V:
-  V = finfun (W \o f) -> hold V r -> hold W (fnrelim f r).
-Proof. move ->. apply/hold_embed. Qed.
+Lemma hold_embed_eq G V:
+  val V = val (tupleOf (tnth W \o f)) -> hold V G -> hold W (graphim f G).
+Proof. move=> /val_inj ->. apply/hold_embed. Qed.
 
-Lemma hold_preim: forall r, hold W r -> hold (finfun (W \o f)) (fnrelpre f r).
-Proof. move=> r H a b /=. rewrite fnrelE !ffunE. by move/H. Qed.
+Lemma hold_preim G: hold W G -> hold (tupleOf (tnth W \o f)) (graphpre f G).
+Proof.
+  move=> H a b /=.
+  rewrite !tupleOf_tnth filter_enumOrd_enum mem_enum.
+  by move/H.
+Qed.
 
 End Env2.
 
-(* Find a map f where V = finfun (W \o f) *)
-(* Ltac findMap V W :=
-  match type of V with {ffun ?S -> U} =>
-    match type of W with {ffun ?T -> U} =>
-      (* Find element b of l where W b = u *)
-      let rec find u l :=
-        match l with
-        | ?b :: ?l' => match Compute (W b) with
-        end
-      in
-      move: (enum S)
+
+(*
+  Finds a value x in sequence l with "y = f x" by computation.
+  The result is wrapped in phantom.
+*)
+Ltac findIn f l y :=
+  match eval compute in l with
+  | ?x :: ?l' =>
+    lazymatch eval compute in (f x) with
+    | y => move: (Phantom _ x)
+    | _ => findIn f l' y
     end
-  end. *)
+  end.
 
-
-(* Using ordinals to construct finite mapping / relation *)
-Section WithOrd.
-Variable n: nat.
-
-Definition tupMap A (t: n.-tuple A): {ffun 'I_n -> A} :=
-  [ffun i => tnth t i].
-
-Definition seqRel (t: seq (nat * nat)): fnrel (ordinal_finType n) :=
-  finrel [rel i j | (nat_of_ord i, nat_of_ord j) \in t].
-
-End WithOrd.
-
-
-Local Example ex_hold_move: forall (a b c d: U),
-  hold (tupMap [tuple a; b; c]) (seqRel _ [:: (0, 1); (1, 2)]) ->
-  hold (tupMap [tuple a; c; b; d]) (seqRel _ [:: (0, 1); (2, 1)]).
-Proof.
-  move=> a b c d.
-  Compute (tupMap [tuple 0; 1; 2] == tupMap [tuple 0; 1; 2]).
-  (* Compute ([tnth [tuple a; b; c] 0]). *)
-  (* findMap (tupMap [tuple a; b; c]) (tupMap [tuple a; c; b; d]). *)
-
-  move /hold_trans.
-  move /(hold_embed_eq
-    (W := tupMap [tuple a; c; b; d])
-    (f := tupMap [tuple inord 0; inord 2; inord 1])).
-  move /(_ erefl).
-  
-  simpl.
-  apply.
-Qed.
+(*
+  Remove duplicates in the list.
+  The result is wrapped in phantom.
+*)
+Ltac rmdup l :=
+  lazymatch type of l with
+  | seq ?U =>
+    let ids := eval simpl in (fun x: U => x) in
+    match eval compute in l with
+    | [::] => move: (Phantom (seq U) [::])
+    | ?a :: ?l' =>
+      rmdup l';
+      match goal with [ |- phantom _ ?res -> _ ] =>
+        move=> _;
+        tryif (findIn ids res a)
+        then move=> _; move: (Phantom (seq U) res)
+        else move: (Phantom (seq U) (a :: res))
+      end
+    end
+  | _ => fail 0 "type of " l " isn't a seq"
+  end.
 
 
 (*
-PROBLEM: Relation cannot be evaluated!
+  Finds a mapping "f: 'I_m -> 'I_n" where
+  "v =1 w \o f" under simplification.
+  The result is wrapped in phantom and discharged into the goal.
+*)
+Ltac findMap v w :=
+  lazymatch type of v with
+  | 'I_?m -> ?T =>
+    lazymatch type of w with
+    | 'I_?n -> ?T =>
+      (* list of b s.t. w b = v a for each element a in l *)
+      let rec findAll l :=
+        lazymatch eval compute in l with
+        | [::] => move: (Phantom (seq 'I_n) [::])
+        | ?a :: ?l' =>
+          let y := eval compute in (v a) in
+          findAll l';
+          findIn w (enumOrd n) y || fail 0 "cannot find " y " from result of " w;
+          match goal with [ |- phantom _ ?b -> phantom _ ?t -> _ ] =>
+            move=> _ _;
+            move: (Phantom (seq 'I_n) (b :: t))
+          end
+        end
+      in
+      findAll (enumOrd m);
+      match goal with [ |- phantom _ ?res -> _ ] =>
+        move => _;
+        move: (Phantom ('I_m -> 'I_n) (tnth [tuple of res]))
+      end
+    | _ => fail 0 "type of " w " is not 'I_?n -> T"
+    end
+  | _ => fail 0 "type of " v " is not 'I_?m -> ?T"
+  end.
+
+(* Simplifies the top hold. Use this to view how it is currently *)
+Ltac holdSimpl := lazymatch goal with
+  | [ |- hold _ ?G -> _ ] => 
+    let vG := eval compute in (val G) in
+    have ->: G = [tuple of vG] by apply/val_inj
+  | _ => fail 0 "Top assumption should be 'hold'"
+  end.
+
+(* Apply image to the top hold *)
+Ltac holdTo W := lazymatch goal with
+  | [ |- hold ?V _ -> _ ] =>
+    findMap (tnth V) (tnth W);
+    lazymatch goal with [ |- phantom _ ?f -> _ ] =>
+      move=> _ /(hold_embed_eq (W := W) (f := f))=> /(_ erefl)
+    end
+  | _ => fail 0 "Top assumption should be 'hold'"
+  end.
+
+(* Adds two top hold statements, applying transitive closure *)
+Ltac holdAdd := lazymatch goal with
+  | [ |- hold ?V ?G -> hold ?W ?K -> _ ] =>
+    rmdup (V ++ W);
+    match goal with [ |- phantom _ ?e -> _ ] =>
+      move=> _;
+      let n := fresh "N" in
+      let E := eval simpl in [tuple of e] in
+      holdTo E => n;
+      holdTo E;
+      move=> /(hold_add n) /hold_trans {n}
+    end
+  | _ => fail 0 "Top 2 assumptions should be 'hold'"
+  end.
+
 
 Local Example ex_hold_move: forall (a b c d: U),
-  hold (tnth [tuple a; b; c])
-    (grel (tnth [tuple [:: inord 1]; [:: inord 2]; [::]]))
-  -> hold (tnth [tuple a; c; b; d])
-    (grel (tnth [tuple [:: inord 1]; [:: inord 1]; [::]; [::]])).
+  hold [tuple a; b] (MkGraph _ [:: (0, 1)]) ->
+  hold [tuple b; c] (MkGraph _ [:: (0, 1)]) ->
+  hold [tuple a; c; b; d] (MkGraph _ [:: (0, 1); (2, 1)]).
 Proof.
-  move=> a b c d. move /hold_trans.
-  move /(hold_embed (f := tnth [tuple (inord 1); (inord 3); (inord 2)])).
-  move /hold_trans.
+  move=> a b c d.
+  holdAdd. holdTo [tuple a; c; b; d].
+  by apply/hold_incl.
 Qed.
-*)
 
 End SDiag.
 
