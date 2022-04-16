@@ -1,6 +1,8 @@
 -R . Practice
 
 Basin/Base.v
+Basin/Tacs.v
+Basin/Evaluable.v
 
 Basin/ListPlus.v
 Basin/Graph.v

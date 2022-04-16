@@ -5,30 +5,15 @@
 From Coq Require Export RelationClasses.
 
 From mathcomp Require Export ssreflect ssrfun ssrbool.
-From mathcomp Require Export eqtype ssrnat seq.
+From mathcomp Require Export eqtype fintype ssrnat seq tuple.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Generalizable All Variables.
 
+Axiom proof_irrelevance: forall (P: Prop) (p1 p2: P), p1 = p2.
+
 (*
-(* Rewrite tactics *)
-(* Setoid_rewrites all occurrences, until it meets True. Renames hypothesis. *)
-Ltac all_rewrite := let BLOCK := True in
-  let rec rec_rewrite :=
-    lazymatch goal with
-    | [ |- BLOCK -> _ ] => intros _
-    | [ |- ?R ?x ?y -> _ ] =>
-      let E := fresh "E" in intros E; try setoid_rewrite E; rec_rewrite
-    end in
-  generalize (I : BLOCK);
-  repeat match goal with
-  | [ E: ?R ?x ?y |- _ ] => revert E
-  end; rec_rewrite.
-
-(* Rewrites all occurrences to match for reflexivity. *)
-Ltac rw_refl := all_rewrite; reflexivity.
-
 
 Property setoid_refl `(Setoid U): forall x, x == x.
 Proof. reflexivity. Qed.
@@ -114,47 +99,5 @@ Lemma is_true_fold: forall p: bool, (p = true) = p.
 Proof. reflexivity. Qed.
 
 Instance trans_gt : Transitive gt := flip_Transitive _.
-
-
-
-(* The following are equivalent *)
-
-Definition TFAE (l: list Prop) : Prop :=
-  forall n m : nat, nth False l n -> nth True l m.
-
-Fixpoint chain_impl (P: Prop) (l: list Prop): Prop :=
-  match l with
-  | Q :: l' => (P -> Q) /\ chain_impl Q l'
-  | _ => True
-  end.
-
-
-Lemma tfae_by_chain: forall P (l: list Prop),
-  chain_impl P l ->
-  (last False l -> P) ->
-  TFAE (P :: l).
-Proof.
-  move=> + l. elim: l=> [|Q l' IH].
-  - move=> P _ _ n m.
-    do !(case: n=> [|n] //=).
-    do !(case: m=> [|m] //=).
-  - move=> /= P [HF HC] HL.
-    have {HC} IH: TFAE(Q :: l'). {
-      apply: {IH HC} (IH _ HC).
-      case: l' HL; firstorder.
-    }
-    case=> [|n'] [|m'] //=.
-    + move/HF => H. by apply: (IH 0 m').
-    + move/(IH n' (size l')). rewrite nth_last //.
-    + apply: (IH n' m').
-Qed.
-
-
-Ltac tfae_chain := apply tfae_by_chain;
-  unfold chain_impl, nth, length, Nat.pred; repeat apply conj; trivial.
-
-Lemma tfae_then_any: forall (n m: nat) (l: list Prop),
-  TFAE l -> nth False l n -> nth True l m.
-Proof. firstorder. Qed.
 
 *)
